@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { HealthStatus } from '@neonpoker/shared';
 
-describe('@neonpoker/shared', () => {
-  it('imports shared types', () => {
-    const status: HealthStatus = 'ok';
-    expect(status).toBe('ok');
+import {
+  PROTOCOL_VERSION,
+  RegisterNicknamePayloadSchema,
+} from '@neonpoker/shared';
+
+describe('@neonpoker/shared workspace import', () => {
+  it('parses nickname payloads through the package barrel', () => {
+    expect(
+      RegisterNicknamePayloadSchema.safeParse({ nickname: 'alice_01' }).success,
+    ).toBe(true);
+    expect(PROTOCOL_VERSION).toBe(1);
   });
 });
