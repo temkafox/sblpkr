@@ -236,7 +236,7 @@ describe('GameService (Phase 6C1)', () => {
     expect(state.hand?.street).toBe('SHOWDOWN');
     expect(state.hand?.showdownReady).toBe(true);
 
-    state = game.progressAfterAction(state);
+    state = game.progressAfterAction(roomId);
     expect(state.hand?.isComplete).toBe(true);
     expect(state.hand?.showdownReady).toBe(true);
     expect(getTotalWealth(state)).toBe(wealthStart);
@@ -273,7 +273,7 @@ describe('GameService (Phase 6C1)', () => {
       if (state.hand?.showdownReady) break;
     }
     if (state.hand?.showdownReady) {
-      state = game.progressAfterAction(state);
+      state = game.progressAfterAction(roomId);
     }
 
     expect(state.hand?.isComplete).toBe(true);

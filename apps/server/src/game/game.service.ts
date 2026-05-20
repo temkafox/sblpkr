@@ -96,13 +96,15 @@ export class GameService {
     }
 
     state = applyAction(state, seatIndex, coreAction);
-    state = this.progressAfterAction(state);
+    state = progressGameState(state);
     this.tableService.setTableState(roomId, state);
     return state;
   }
 
-  progressAfterAction(state: CoreGameState): CoreGameState {
-    return progressGameState(state);
+  progressAfterAction(roomId: string): CoreGameState {
+    const progressed = progressGameState(this.getGameState(roomId));
+    this.tableService.setTableState(roomId, progressed);
+    return progressed;
   }
 
   private requireRoom(roomId: string) {
