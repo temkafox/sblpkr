@@ -160,6 +160,7 @@ export function disconnectSocket(): void {
   listenersAttached = false;
   gameStateListeners.clear();
   handResultListeners.clear();
+  useGameStore.getState().clearHandResult();
   setConnectionStatus('idle');
 }
 
@@ -173,6 +174,7 @@ export function leaveRoom(roomId?: string): void {
   } else {
     socket?.emit(CLIENT_LEAVE_ROOM, {});
   }
+  useGameStore.getState().clearHandResult();
 }
 
 export function joinRoom(roomId: string): Promise<RoomStatePayload> {

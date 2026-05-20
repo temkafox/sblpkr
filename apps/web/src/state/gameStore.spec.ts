@@ -41,8 +41,51 @@ describe('gameStore', () => {
     expect(useGameStore.getState().gameError).toBe('Not your turn');
   });
 
+  it('setGameState clears handResult when a new hand starts', () => {
+    useGameStore.getState().setHandResult({
+      handId: 'old-hand',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 10 },
+      totalAwarded: 10,
+    });
+
+    useGameStore.getState().setGameState({
+      tableId: 't1',
+      maxSeats: 2,
+      street: 'PRE-FLOP',
+      boardCards: [],
+      pot: { total: 3, sidePots: [] },
+      dealerSeatIndex: 0,
+      smallBlindSeatIndex: 0,
+      bigBlindSeatIndex: 1,
+      activeSeatIndex: 0,
+      seats: [],
+      handId: 'new-hand',
+      handComplete: false,
+      showdownReady: false,
+    });
+
+    expect(useGameStore.getState().handResult).toBeNull();
+  });
+
+  it('clearHandResult resets only hand result', () => {
+    useGameStore.getState().setHandResult({
+      handId: 'h1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 10 },
+      totalAwarded: 10,
+    });
+    useGameStore.getState().clearHandResult();
+    expect(useGameStore.getState().handResult).toBeNull();
+  });
+
   it('clearGameState resets all fields', () => {
-    useGameStore.getState().setHandResult({ handId: 'h1', winnerSeatIndexes: [0] });
+    useGameStore.getState().setHandResult({
+      handId: 'h1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 10 },
+      totalAwarded: 10,
+    });
     useGameStore.getState().clearGameState();
     const s = useGameStore.getState();
     expect(s.gameState).toBeNull();

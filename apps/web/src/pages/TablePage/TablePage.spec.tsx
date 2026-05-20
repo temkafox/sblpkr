@@ -353,4 +353,61 @@ describe('TablePage live room', () => {
     expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$76');
     expect(container.textContent).not.toMatch(/\$\d+\.\d+/);
   });
+
+  it('shows result banner after handResult and disables ActionBar when hand complete', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      availableActions: undefined,
+    });
+    useGameStore.getState().setHandResult({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 15 },
+      totalAwarded: 15,
+      isFoldWin: true,
+    });
+    const { container } = renderTable();
+    expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
+    expect(screen.getByText('+$15')).toBeInTheDocument();
+    expect(container.querySelector('.np-action-bar')).toBeNull();
+  });
+
+  it('Start Next Hand emits startHand when hand is complete', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+    });
+    useGameStore.getState().setHandResult({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 15 },
+      totalAwarded: 15,
+    });
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /start next hand/i }));
+    expect(socket.startHand).toHaveBeenCalledWith(roomId);
+  });
+
+  it('clears handResult when new SERVER_GAME_STATE starts next hand', () => {
+    useGameStore.getState().setHandResult({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 15 },
+      totalAwarded: 15,
+    });
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handId: 'hand-2',
+      handComplete: false,
+      street: 'PRE-FLOP',
+    });
+    expect(useGameStore.getState().handResult).toBeNull();
+  });
 });

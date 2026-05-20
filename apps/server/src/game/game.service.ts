@@ -14,6 +14,7 @@ import { TableService } from '../table/table.service';
 import { toCorePlayerAction } from './action-mapper';
 import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
+import { buildHandResultPayload } from './hand-result';
 
 export type GameRngFactory = (roomId: string) => RandomSource;
 
@@ -75,6 +76,7 @@ export class GameService {
     }
 
     this.tableService.setTableState(roomId, started);
+    this.tableService.clearHandResult(roomId);
     return started;
   }
 
@@ -94,15 +96,37 @@ export class GameService {
     }
 
     state = applyAction(state, seatIndex, coreAction);
-    state = progressGameState(state);
+    const progressed = progressGameState(state);
+    state = progressed.state;
+    if (progressed.showdownResult != null && state.hand?.handId != null) {
+      this.tableService.setHandResult(
+        roomId,
+        buildHandResultPayload(
+          state.hand.handId,
+          progressed.showdownResult,
+          progressed.isFoldWin,
+        ),
+      );
+    }
     this.tableService.setTableState(roomId, state);
     return state;
   }
 
   progressAfterAction(roomId: string): CoreGameState {
     const progressed = progressGameState(this.getGameState(roomId));
-    this.tableService.setTableState(roomId, progressed);
-    return progressed;
+    const state = progressed.state;
+    if (progressed.showdownResult != null && state.hand?.handId != null) {
+      this.tableService.setHandResult(
+        roomId,
+        buildHandResultPayload(
+          state.hand.handId,
+          progressed.showdownResult,
+          progressed.isFoldWin,
+        ),
+      );
+    }
+    this.tableService.setTableState(roomId, state);
+    return state;
   }
 
   /**

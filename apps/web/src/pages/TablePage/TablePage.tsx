@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import { ActionBar } from '../../components/action-bar/ActionBar';
 import { BoardCards } from '../../components/cards/BoardCards';
 import { HeroHoleCards } from '../../components/cards/HeroHoleCards';
+import { HandResultBanner } from '../../components/result/HandResultBanner';
 import { SeatLayer } from '../../components/seats/SeatLayer';
 import { Pot } from '../../components/table/Pot';
 import { TableSurface } from '../../components/table/TableSurface';
@@ -29,6 +30,7 @@ export function TablePage() {
   const nickname = useSessionStore((s) => s.nickname);
   const connectionStatus = useSessionStore((s) => s.connectionStatus);
   const gameState = useGameStore((s) => s.gameState);
+  const handResult = useGameStore((s) => s.handResult);
   const isGameLoading = useGameStore((s) => s.isGameLoading);
   const isSubmittingAction = useGameStore((s) => s.isSubmittingAction);
   const gameError = useGameStore((s) => s.gameError);
@@ -47,12 +49,18 @@ export function TablePage() {
     isActiveHand(gameState) &&
     rosterAligned &&
     enoughPlayersForHand;
+  const handComplete = Boolean(hasActiveHand && gameState?.handComplete);
+  const handInProgress = hasActiveHand && !handComplete;
+  const showHandResult =
+    handComplete &&
+    handResult != null &&
+    handResult.handId === gameState?.handId;
 
   const viewerSeatIndex =
     gameState != null ? findViewerSeatIndex(gameState, nickname) : null;
   const availableActions = gameState?.availableActions;
   const isMyTurn =
-    hasActiveHand &&
+    handInProgress &&
     availableActions != null &&
     viewerSeatIndex != null &&
     gameState?.activeSeatIndex === viewerSeatIndex;
@@ -87,6 +95,13 @@ export function TablePage() {
     playerCount >= minPlayersToStart &&
     !hasActiveHand;
 
+  const canStartNextHand =
+    isLiveRoom &&
+    connectionStatus === 'connected' &&
+    roomId != null &&
+    playerCount >= minPlayersToStart &&
+    showHandResult;
+
   const waitingForPlayers =
     isLiveRoom && !hasActiveHand && playerCount < minPlayersToStart;
 
@@ -94,6 +109,11 @@ export function TablePage() {
     if (!roomId || !canStartHand) return;
     startHand(roomId);
   }, [roomId, canStartHand]);
+
+  const handleStartNextHand = useCallback(() => {
+    if (!roomId || !canStartNextHand) return;
+    startHand(roomId);
+  }, [roomId, canStartNextHand]);
 
   const emitAction = useCallback(
     (action: Parameters<typeof sendPlayerAction>[1]) => {
@@ -145,7 +165,7 @@ export function TablePage() {
               : null;
 
   const actionErrorLabel =
-    handActive && gameError != null && gameError.length > 0
+    handInProgress && gameError != null && gameError.length > 0
       ? gameError
       : null;
 
@@ -182,8 +202,26 @@ export function TablePage() {
           </button>
         </div>
       ) : null}
+      {canStartNextHand ? (
+        <div className="table-page__next-hand">
+          <button
+            type="button"
+            className="table-page__start-hand table-page__start-hand--next"
+            onClick={handleStartNextHand}
+          >
+            Start Next Hand
+          </button>
+        </div>
+      ) : null}
       <TableSurface />
       <Pot amount={tableView.potAmount} showChips={tableView.showPotChips} />
+      {showHandResult ? (
+        <HandResultBanner
+          result={handResult}
+          roomState={roomState}
+          gameState={gameState}
+        />
+      ) : null}
       {handActive ? (
         <BoardCards
           cards={tableView.boardCards}
@@ -200,7 +238,7 @@ export function TablePage() {
         gameState={tableView.gameState}
         handActive={handActive}
       />
-      {handActive ? (
+      {handInProgress ? (
         <ActionBar
           availableActions={availableActions}
           potAmount={gameState?.pot.total ?? 0}

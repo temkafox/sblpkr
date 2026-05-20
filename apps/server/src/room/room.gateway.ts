@@ -203,6 +203,7 @@ export class RoomGateway implements OnGatewayDisconnect {
       const room = this.roomService.getRoom(roomId);
       const view = toPlayerGameState(state, seatIndex, room);
       client.emit(SERVER_GAME_STATE, view);
+      this.gameBroadcast.emitHandResultToClient(client, roomId, state);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);

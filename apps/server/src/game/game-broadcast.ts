@@ -4,7 +4,8 @@ import {
   SERVER_GAME_STATE,
   SERVER_HAND_RESULT,
 } from '@neonpoker/shared';
-import type { Server } from 'socket.io';
+import type { HandResultPayload } from '@neonpoker/shared';
+import type { Server, Socket } from 'socket.io';
 
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
@@ -46,9 +47,27 @@ export class GameBroadcastService {
     roomId: string,
     state: CoreGameState,
   ): void {
-    const result = extractHandResult(state);
+    const result = this.resolveHandResult(roomId, state);
     if (result == null) return;
     server.to(roomId).emit(SERVER_HAND_RESULT, result);
+  }
+
+  emitHandResultToClient(
+    client: Socket,
+    roomId: string,
+    state: CoreGameState,
+  ): void {
+    const result = this.resolveHandResult(roomId, state);
+    if (result == null) return;
+    client.emit(SERVER_HAND_RESULT, result);
+  }
+
+  private resolveHandResult(
+    roomId: string,
+    state: CoreGameState,
+  ): HandResultPayload | null {
+    const cached = this.tableService.getHandResult(roomId);
+    return extractHandResult(state, cached);
   }
 
   emitGameUpdateToRoom(

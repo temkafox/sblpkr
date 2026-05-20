@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { CoreGameState } from '@neonpoker/poker-core';
 import { createInitialGameState } from '@neonpoker/poker-core';
+import type { HandResultPayload } from '@neonpoker/shared';
 
 import {
   DEFAULT_BIG_BLIND,
@@ -12,6 +13,7 @@ import type { MutableInternalRoom } from '../room/room.types';
 @Injectable()
 export class TableService {
   private readonly tables = new Map<string, CoreGameState>();
+  private readonly handResults = new Map<string, HandResultPayload>();
 
   hasTable(roomId: string): boolean {
     return this.tables.has(roomId);
@@ -26,7 +28,20 @@ export class TableService {
   }
 
   deleteTable(roomId: string): boolean {
+    this.handResults.delete(roomId);
     return this.tables.delete(roomId);
+  }
+
+  getHandResult(roomId: string): HandResultPayload | null {
+    return this.handResults.get(roomId) ?? null;
+  }
+
+  setHandResult(roomId: string, result: HandResultPayload): void {
+    this.handResults.set(roomId, result);
+  }
+
+  clearHandResult(roomId: string): void {
+    this.handResults.delete(roomId);
   }
 
   /** Builds a fresh core table from the current room roster (join order → seat index). */

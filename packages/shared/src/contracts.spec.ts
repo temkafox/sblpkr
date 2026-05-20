@@ -4,6 +4,7 @@ import {
   ChatMessagePayloadSchema,
   ClientHelloSchema,
   CreateRoomRequestSchema,
+  HandResultPayloadSchema,
   JoinRoomPayloadSchema,
   RoomStateSchema,
   PlayerActionPayloadSchema,
@@ -85,6 +86,32 @@ describe('PlayerActionPayloadSchema', () => {
       PlayerActionPayloadSchema.parse({
         roomId: 'room-1',
         action: { kind: 'donate' },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('HandResultPayloadSchema', () => {
+  it('parses extended hand result payload', () => {
+    const parsed = HandResultPayloadSchema.parse({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0, 1],
+      awardedAmountsBySeatIndex: { '0': 10, '1': 5 },
+      totalAwarded: 15,
+      isFoldWin: false,
+      winningHandLabel: 'Two Pair',
+    });
+    expect(parsed.totalAwarded).toBe(15);
+  });
+
+  it('rejects hand result with deck field via strict schema', () => {
+    expect(() =>
+      HandResultPayloadSchema.parse({
+        handId: 'hand-1',
+        winnerSeatIndexes: [0],
+        awardedAmountsBySeatIndex: { '0': 10 },
+        totalAwarded: 10,
+        deck: [],
       }),
     ).toThrow();
   });

@@ -324,7 +324,11 @@ describe('Game gateway (Phase 6C2)', () => {
     await waitForEvent(a, SERVER_GAME_STATE);
     await waitForEvent(b, SERVER_GAME_STATE);
 
-    const resultP = waitForEvent<{ winnerSeatIndexes: number[] }>(
+    const resultP = waitForEvent<{
+      winnerSeatIndexes: number[];
+      totalAwarded: number;
+      awardedAmountsBySeatIndex: Record<string, number>;
+    }>(
       actor,
       SERVER_HAND_RESULT,
     );
@@ -336,6 +340,8 @@ describe('Game gateway (Phase 6C2)', () => {
 
     const result = await resultP;
     expect(result.winnerSeatIndexes).toContain(active);
+    expect(result.totalAwarded).toBeGreaterThan(0);
+    expect(result.awardedAmountsBySeatIndex[String(active)]).toBeGreaterThan(0);
 
     a.disconnect();
     b.disconnect();

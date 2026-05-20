@@ -63,6 +63,7 @@ export {
 
 export type { PotResult, ShowdownResult } from './engine/showdown';
 export {
+  computeShowdownResult,
   determineShowdownWinners,
   distributePots,
   resolveFoldWin,
@@ -105,6 +106,7 @@ export {
 
 export {
   advanceTurnAfterAction,
+  getContestantSeatIndexes,
   isBettingRoundComplete,
   needsToAct,
 } from './engine/betting-round';

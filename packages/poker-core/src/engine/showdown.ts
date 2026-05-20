@@ -336,21 +336,30 @@ function applyChipSettlement(
 }
 
 /**
+ * Computes winner analysis and pot awards without mutating stacks.
+ * Safe to call on pre-settlement state (commitments still present).
+ */
+
+export function computeShowdownResult(state: CoreGameState): ShowdownResult {
+  assertCanResolve(state);
+
+  const synced = syncPotsFromCommitments(state);
+  const breakdown = calculateSidePotBreakdown(synced);
+
+  return isFoldWinContest(synced)
+    ? determineFoldWinShowdownResult(synced, breakdown)
+    : determineShowdownWinners(synced);
+}
+
+/**
  * Terminal resolution: sync pots from commitments, compute winners, credit stacks,
  * refund uncalled tails, settle commitments (`totalCommitted` / `currentBet` zeroed),
  * mark `hand.isComplete` + `hand.showdownReady`.
  */
 
 export function resolveShowdown(state: CoreGameState): CoreGameState {
-  assertCanResolve(state);
-
   const synced = syncPotsFromCommitments(state);
-  const breakdown = calculateSidePotBreakdown(synced);
-
-  const result = isFoldWinContest(synced)
-    ? determineFoldWinShowdownResult(synced, breakdown)
-    : determineShowdownWinners(synced);
-
+  const result = computeShowdownResult(state);
   return applyChipSettlement(synced, result);
 }
 

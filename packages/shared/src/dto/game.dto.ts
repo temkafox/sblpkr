@@ -83,10 +83,27 @@ export const PlayerGameStateSchema = PublicGameStateSchema.extend({
   availableActions: availableActionsSchema.optional(),
 });
 
-export const HandResultPayloadSchema = z.object({
-  handId: z.string().min(1),
-  winnerSeatIndexes: z.array(z.number().int().nonnegative()),
+export const HandResultPotSchema = z.object({
+  potIndex: z.number().int().nonnegative(),
+  amount: ChipAmountSchema,
+  winningSeatIndexes: z.array(z.number().int().nonnegative()),
+  awardedAmountsBySeatIndex: z.record(z.string(), ChipAmountSchema),
+  winningHandLabel: z.string().nullable().optional(),
 });
+
+export const HandResultPayloadSchema = z
+  .object({
+    handId: z.string().min(1),
+    winnerSeatIndexes: z.array(z.number().int().nonnegative()),
+    awardedAmountsBySeatIndex: z.record(z.string(), ChipAmountSchema),
+    totalAwarded: ChipAmountSchema,
+    isFoldWin: z.boolean().optional(),
+    potResults: z.array(HandResultPotSchema).optional(),
+    winningHandLabel: z.string().nullable().optional(),
+  })
+  .strict();
+
+export type HandResultPot = z.infer<typeof HandResultPotSchema>;
 
 export const StartHandPayloadSchema = z.object({
   roomId: z.string().trim().min(1).max(128),

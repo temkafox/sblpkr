@@ -71,6 +71,25 @@
   z-index: 65;
 }
 
+.table-page__next-hand {
+  position: absolute;
+  bottom: 210px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+}
+
+.table-page__start-hand--next {
+  border-color: rgba(139, 92, 255, 0.65);
+  color: #ece1ff;
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(139, 92, 255, 0.28), transparent 60%),
+    rgba(10, 4, 20, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 255, 0.45) inset,
+    0 0 22px rgba(139, 92, 255, 0.45);
+}
+
 .table-page__start-hand {
   padding: 10px 22px;
   font-family: var(--font-display);

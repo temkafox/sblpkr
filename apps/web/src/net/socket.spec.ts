@@ -54,6 +54,9 @@ const gameState: PlayerGameState = {
 const handResult: HandResultPayload = {
   handId: 'hand-1',
   winnerSeatIndexes: [0],
+  awardedAmountsBySeatIndex: { '0': 15 },
+  totalAwarded: 15,
+  isFoldWin: true,
 };
 
 type Handler = (...args: unknown[]) => void;
