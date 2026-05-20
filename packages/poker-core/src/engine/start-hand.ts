@@ -163,6 +163,10 @@ export function startHand(
     lastRaiseAmount: stateWithButton.table.bigBlind,
     lastAggressorSeatIndex: bbSeat,
     actedSeatIndexes: Object.freeze([]),
+    lastPublicActionsBySeat: Object.freeze({
+      [sbSeat]: Object.freeze({ kind: 'post_sb', amount: sbPosted }),
+      [bbSeat]: Object.freeze({ kind: 'post_bb', amount: bbPosted }),
+    }),
     raiseFrozenSeatIndexes: Object.freeze([]),
     showdownReady: false,
     isComplete: false,

@@ -32,6 +32,8 @@ function mkHand(
     lastRaiseAmount: o.lastRaiseAmount ?? o.minRaise,
     lastAggressorSeatIndex: o.lastAggressorSeatIndex ?? null,
     actedSeatIndexes: o.actedSeatIndexes,
+    lastPublicActionsBySeat:
+      o.lastPublicActionsBySeat ?? Object.freeze({}),
     raiseFrozenSeatIndexes: o.raiseFrozenSeatIndexes ?? Object.freeze([]),
     showdownReady: o.showdownReady ?? false,
     isComplete: o.isComplete ?? false,

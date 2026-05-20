@@ -52,6 +52,22 @@ const availableActionsSchema = z.object({
   canAllIn: z.boolean(),
 });
 
+/** Latest public betting action for seat HUD labels (no hole cards / deck). */
+export const PublicSeatActionKindSchema = z.enum([
+  'fold',
+  'check',
+  'call',
+  'raise',
+  'allin',
+  'post_sb',
+  'post_bb',
+]);
+
+export const PublicSeatActionSchema = z.object({
+  kind: PublicSeatActionKindSchema,
+  amount: ChipAmountSchema.optional(),
+});
+
 export const WireSeatViewSchema = z.object({
   seatIndex: z.number().int().nonnegative(),
   playerId: z.string().nullable(),
@@ -63,6 +79,8 @@ export const WireSeatViewSchema = z.object({
   isSittingOut: z.boolean(),
   holeCards: z.array(cardSchema).nullable(),
   holeCardCount: z.number().int().nonnegative().nullable(),
+  lastAction: PublicSeatActionSchema.nullable().optional(),
+  isWinner: z.boolean().optional(),
 });
 
 export const PublicGameStateSchema = z.object({
@@ -80,6 +98,7 @@ export const PublicGameStateSchema = z.object({
   handComplete: z.boolean(),
   showdownReady: z.boolean(),
   handEndKind: handEndKindSchema.nullable().optional(),
+  winnerSeatIndexes: z.array(z.number().int().nonnegative()).optional(),
 });
 
 export const PlayerGameStateSchema = PublicGameStateSchema.extend({
@@ -127,6 +146,8 @@ export const RebuyConfirmedPayloadSchema = z.object({
   chips: ChipAmountSchema,
 });
 
+export type PublicSeatActionKind = z.infer<typeof PublicSeatActionKindSchema>;
+export type PublicSeatAction = z.infer<typeof PublicSeatActionSchema>;
 export type WireSeatView = z.infer<typeof WireSeatViewSchema>;
 export type PublicGameState = z.infer<typeof PublicGameStateSchema>;
 export type PlayerGameState = z.infer<typeof PlayerGameStateSchema>;

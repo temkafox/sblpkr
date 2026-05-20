@@ -88,6 +88,7 @@ function withStubHand(state: CoreGameState): CoreGameState {
     lastRaiseAmount: 0,
     lastAggressorSeatIndex: null,
     actedSeatIndexes: Object.freeze([]),
+    lastPublicActionsBySeat: Object.freeze({}),
     raiseFrozenSeatIndexes: Object.freeze([]),
     showdownReady: false,
     isComplete: false,

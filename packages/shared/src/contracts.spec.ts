@@ -6,6 +6,7 @@ import {
   CreateRoomRequestSchema,
   HandResultPayloadSchema,
   JoinRoomPayloadSchema,
+  PublicSeatActionSchema,
   RoomStateSchema,
   PlayerActionPayloadSchema,
   PROTOCOL_VERSION,
@@ -89,6 +90,15 @@ describe('PlayerActionPayloadSchema', () => {
         action: { kind: 'donate' },
       }),
     ).toThrow();
+  });
+});
+
+describe('PublicSeatActionSchema', () => {
+  it('parses check and raise actions', () => {
+    expect(PublicSeatActionSchema.parse({ kind: 'check' }).kind).toBe('check');
+    expect(
+      PublicSeatActionSchema.parse({ kind: 'raise', amount: 40 }).amount,
+    ).toBe(40);
   });
 });
 

@@ -17,6 +17,7 @@ function opponentStateClass(status: SeatStateMock['status']) {
     case 'winner':
       return 'state-winner';
     case 'sitout':
+    case 'busted':
       return 'state-sitout';
     default:
       return '';
@@ -40,7 +41,11 @@ function opponentStatusClass(status: SeatStateMock['status']) {
     case 'winner':
       return 't-winner';
     case 'sitout':
+    case 'busted':
       return 't-sitout';
+    case 'post_sb':
+    case 'post_bb':
+      return 't-check';
     default:
       return 't-idle';
   }
@@ -64,6 +69,12 @@ function opponentStatusText(st: SeatStateMock): string {
       return 'WINNER';
     case 'sitout':
       return 'SITTING OUT';
+    case 'busted':
+      return 'BUSTED';
+    case 'post_sb':
+      return st.bet ? `SB $${formatChips(st.bet)}` : 'SB';
+    case 'post_bb':
+      return st.bet ? `BB $${formatChips(st.bet)}` : 'BB';
     case 'waiting':
       return '';
     default:

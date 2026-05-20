@@ -16,6 +16,7 @@ import {
   toPlayerGameState,
   toPublicGameState,
 } from './game-state-view';
+import { progressGameState } from './game-progress';
 
 function sampleRoom(): MutableInternalRoom {
   return {
@@ -140,6 +141,32 @@ describe('game-state-view (Phase 6C2)', () => {
     const view = toPlayerGameState(state, seat, sampleRoom());
     expect(view.street).toBe('PRE-FLOP');
     expect(view.pot.total).toBeGreaterThan(0);
+  });
+
+  it('exposes lastAction on wire after betting actions', () => {
+    let state = huState();
+    const actor = state.table.activeSeatIndex!;
+    state = applyAction(state, actor, { kind: 'call' });
+
+    const view = PlayerGameStateSchema.parse(toPlayerGameState(state, actor, sampleRoom()));
+    const seat = view.seats[actor]!;
+    expect(seat.lastAction?.kind).toBe('call');
+    expect(seat.lastAction?.amount).toBeGreaterThan(0);
+    expect(containsPrivateEngineFields(view)).toBe(false);
+    expect(JSON.stringify(view).includes('deck')).toBe(false);
+  });
+
+  it('marks winner seats when hand is complete', () => {
+    let state = huState();
+    const folder = state.table.activeSeatIndex!;
+    state = applyAction(state, folder, { kind: 'fold' });
+    const { state: done } = progressGameState(state);
+    const winnerSeat = done.table.bigBlindSeatIndex;
+
+    const view = toPlayerGameState(done, folder, sampleRoom());
+    expect(view.winnerSeatIndexes).toEqual([winnerSeat]);
+    expect(view.seats[winnerSeat]!.isWinner).toBe(true);
+    expect(view.seats[folder]!.isWinner).toBe(false);
   });
 
   it('mid-hand all-in at zero chips is not sitting out on the wire', () => {

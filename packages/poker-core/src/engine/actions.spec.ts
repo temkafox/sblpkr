@@ -83,6 +83,62 @@ describe('applyAction', () => {
     expect(g.hand?.pots.total).toBe(15);
   });
 
+  it('records last public action for check, call, raise, fold, and all-in', () => {
+    let g = sixMaxThreeWay();
+    const utg = g.table.activeSeatIndex!;
+    g = applyAction(g, utg, { kind: 'call' });
+    expect(g.hand?.lastPublicActionsBySeat[utg]?.kind).toBe('call');
+
+    const sbSeat = g.table.activeSeatIndex!;
+    g = applyAction(g, sbSeat, { kind: 'call' });
+    expect(g.hand?.lastPublicActionsBySeat[sbSeat]?.kind).toBe('call');
+
+    const bbSeat = g.table.activeSeatIndex!;
+    g = applyAction(g, bbSeat, { kind: 'check' });
+    expect(g.hand?.lastPublicActionsBySeat[bbSeat]?.kind).toBe('check');
+
+    g = sixMaxThreeWay();
+    const raiser = g.table.activeSeatIndex!;
+    const target = g.hand!.currentBet + g.hand!.minRaise;
+    g = applyAction(g, raiser, { kind: 'raise', amount: target });
+    expect(g.hand?.lastPublicActionsBySeat[raiser]).toEqual({
+      kind: 'raise',
+      amount: target,
+    });
+
+    const folder = g.table.activeSeatIndex!;
+    g = applyAction(g, folder, { kind: 'fold' });
+    expect(g.hand?.lastPublicActionsBySeat[folder]?.kind).toBe('fold');
+
+    let hu = createInitialGameState({
+      table: { tableId: 'hu', maxSeats: 4, smallBlind: 5, bigBlind: 10 },
+      players: [
+        { playerId: 'sb', seatIndex: 0, startingChips: 50 },
+        { playerId: 'bb', seatIndex: 3, startingChips: 100 },
+      ],
+    });
+    hu = startHand(
+      Object.freeze({
+        ...hu,
+        table: Object.freeze({ ...hu.table, dealerSeatIndex: 3 }),
+      }),
+      { rng },
+    );
+    const shover = hu.table.activeSeatIndex!;
+    hu = applyAction(hu, shover, { kind: 'allin' });
+    expect(hu.hand?.lastPublicActionsBySeat[shover]?.kind).toBe('allin');
+  });
+
+  it('posts blind labels on hand start', () => {
+    const g = sixMaxThreeWay();
+    expect(g.hand?.lastPublicActionsBySeat[g.table.smallBlindSeatIndex]?.kind).toBe(
+      'post_sb',
+    );
+    expect(g.hand?.lastPublicActionsBySeat[g.table.bigBlindSeatIndex]?.kind).toBe(
+      'post_bb',
+    );
+  });
+
   it('check advances turn when facing no bet', () => {
     let g = sixMaxThreeWay();
     const utg = g.table.activeSeatIndex!;

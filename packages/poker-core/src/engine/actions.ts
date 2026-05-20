@@ -20,6 +20,7 @@ import {
 } from './errors';
 import { requireIntegerChipAmount } from './chip-amount';
 import { applyAggressiveBetMetadata, getMinimumRaiseTarget } from './min-raise';
+import { recordPublicSeatAction } from './public-seat-action';
 import { getPlayerAtSeat } from './seat-utils';
 
 function clonePlayers(
@@ -66,10 +67,14 @@ export function applyAction(
       nextState = Object.freeze({
         ...state,
         playersById: Object.freeze(players),
-        hand: Object.freeze({
-          ...hand,
-          actedSeatIndexes: appendActedSeat(hand, seatIndex),
-        }),
+        hand: recordPublicSeatAction(
+          Object.freeze({
+            ...hand,
+            actedSeatIndexes: appendActedSeat(hand, seatIndex),
+          }),
+          seatIndex,
+          { kind: 'fold' },
+        ),
       });
       break;
     }
@@ -80,10 +85,14 @@ export function applyAction(
       nextState = Object.freeze({
         ...state,
         playersById: Object.freeze(players),
-        hand: Object.freeze({
-          ...hand,
-          actedSeatIndexes: appendActedSeat(hand, seatIndex),
-        }),
+        hand: recordPublicSeatAction(
+          Object.freeze({
+            ...hand,
+            actedSeatIndexes: appendActedSeat(hand, seatIndex),
+          }),
+          seatIndex,
+          { kind: 'check' },
+        ),
       });
       break;
     }
@@ -107,10 +116,16 @@ export function applyAction(
       nextState = Object.freeze({
         ...state,
         playersById: Object.freeze(players),
-        hand: Object.freeze({
-          ...hand,
-          actedSeatIndexes: appendActedSeat(hand, seatIndex),
-        }),
+        hand: recordPublicSeatAction(
+          Object.freeze({
+            ...hand,
+            actedSeatIndexes: appendActedSeat(hand, seatIndex),
+          }),
+          seatIndex,
+          isAllIn
+            ? { kind: 'allin', amount: currentBet }
+            : { kind: 'call', amount: pay },
+        ),
       });
       break;
     }
@@ -146,12 +161,21 @@ export function applyAction(
         hand,
       });
 
-      nextState = applyAggressiveBetMetadata(
-        interim,
-        seatIndex,
-        hand.currentBet,
-        target,
-      );
+      {
+        const withMeta = applyAggressiveBetMetadata(
+          interim,
+          seatIndex,
+          hand.currentBet,
+          target,
+        );
+        nextState = Object.freeze({
+          ...withMeta,
+          hand: recordPublicSeatAction(withMeta.hand!, seatIndex, {
+            kind: 'raise',
+            amount: target,
+          }),
+        });
+      }
       break;
     }
     case 'allin': {
@@ -176,19 +200,30 @@ export function applyAction(
       });
 
       if (target > hand.currentBet) {
-        nextState = applyAggressiveBetMetadata(
+        const withMeta = applyAggressiveBetMetadata(
           interim,
           seatIndex,
           hand.currentBet,
           target,
         );
+        nextState = Object.freeze({
+          ...withMeta,
+          hand: recordPublicSeatAction(withMeta.hand!, seatIndex, {
+            kind: 'allin',
+            amount: target,
+          }),
+        });
       } else {
         nextState = Object.freeze({
           ...interim,
-          hand: Object.freeze({
-            ...hand,
-            actedSeatIndexes: appendActedSeat(hand, seatIndex),
-          }),
+          hand: recordPublicSeatAction(
+            Object.freeze({
+              ...hand,
+              actedSeatIndexes: appendActedSeat(hand, seatIndex),
+            }),
+            seatIndex,
+            { kind: 'allin', amount: target },
+          ),
         });
       }
       break;

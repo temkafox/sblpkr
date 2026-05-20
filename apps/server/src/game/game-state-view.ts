@@ -12,10 +12,12 @@ import type {
   HandEndKind,
   PublicGameState,
   PlayerGameState,
+  PublicSeatAction,
   WireSeatView,
 } from '@neonpoker/shared';
 
 import type { MutableInternalRoom } from '../room/room.types';
+import { computeHandResultPayload } from './hand-result';
 
 type NicknameLookup = ReadonlyMap<string, string>;
 
@@ -101,6 +103,29 @@ function isHandComplete(state: CoreGameState): boolean {
   return hand != null && hand.isComplete;
 }
 
+function winnerSeatIndexesForState(state: CoreGameState): readonly number[] {
+  const hand = state.hand;
+  if (hand == null || !hand.isComplete) {
+    return Object.freeze([]);
+  }
+  if (isFoldWinHand(state)) {
+    return Object.freeze(getNonFoldedSeatIndexes(syncPotsFromCommitments(state)));
+  }
+  const payload = computeHandResultPayload(state);
+  return Object.freeze(payload?.winnerSeatIndexes ?? []);
+}
+
+function lastActionForSeat(
+  state: CoreGameState,
+  seatIndex: SeatIndex,
+): PublicSeatAction | null {
+  const hand = state.hand;
+  if (hand == null) {
+    return null;
+  }
+  return hand.lastPublicActionsBySeat[seatIndex] ?? null;
+}
+
 function holeCardsForSeat(
   state: CoreGameState,
   seatIndex: SeatIndex,
@@ -131,8 +156,10 @@ function buildSeatViews(
   state: CoreGameState,
   room: MutableInternalRoom | null,
   viewerSeatIndex: SeatIndex | null,
+  winnerSeatIndexes: readonly number[],
 ): WireSeatView[] {
   const nicknames = nicknameByPlayerId(room);
+  const winnerSet = new Set(winnerSeatIndexes);
 
   return state.table.seats.map((seat) => {
       const runtime = getPlayerAtSeat(state, seat.seatIndex);
@@ -151,6 +178,8 @@ function buildSeatViews(
         hasFolded: runtime?.hasFolded ?? false,
         isAllIn: runtime?.isAllIn ?? false,
         isSittingOut: runtime?.isSittingOut ?? false,
+        lastAction: lastActionForSeat(state, seat.seatIndex),
+        isWinner: winnerSet.has(seat.seatIndex),
         holeCards:
           holeCards != null ? holeCards.map((c) => ({ r: c.r, s: c.s })) : null,
         holeCardCount,
@@ -164,6 +193,7 @@ function baseView(
   viewerSeatIndex: SeatIndex | null,
 ): PublicGameState {
   const hand = state.hand;
+  const winners = winnerSeatIndexesForState(state);
 
   return {
     tableId: state.table.tableId,
@@ -175,11 +205,12 @@ function baseView(
     smallBlindSeatIndex: hand != null ? state.table.smallBlindSeatIndex : null,
     bigBlindSeatIndex: hand != null ? state.table.bigBlindSeatIndex : null,
     activeSeatIndex: state.table.activeSeatIndex,
-    seats: [...buildSeatViews(state, room, viewerSeatIndex)],
+    seats: [...buildSeatViews(state, room, viewerSeatIndex, winners)],
     handId: hand?.handId ?? null,
     handComplete: hand?.isComplete ?? false,
     showdownReady: hand?.showdownReady ?? false,
     handEndKind: handEndKindForState(state),
+    winnerSeatIndexes: hand?.isComplete ? [...winners] : undefined,
   };
 }
 
@@ -240,11 +271,14 @@ export function toIdlePlayerGameState(
     handComplete: false,
     showdownReady: false,
     handEndKind: null,
+    winnerSeatIndexes: undefined,
     seats: view.seats.map((seat) => ({
       ...seat,
       currentBet: 0,
       hasFolded: false,
       isAllIn: false,
+      lastAction: null,
+      isWinner: false,
       holeCards: null,
       holeCardCount: null,
     })),

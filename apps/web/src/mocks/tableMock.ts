@@ -64,6 +64,9 @@ export type SeatStatus =
   | 'raise'
   | 'allin'
   | 'winner'
+  | 'post_sb'
+  | 'post_bb'
+  | 'busted'
   | 'sitout'
   | 'idle'
   | 'waiting';

@@ -27,9 +27,23 @@ function totalPlayerWealth(state: CoreGameState): number {
   return sum;
 }
 
-function makeHand(base: Omit<HandState, 'pots'> & { pots?: HandState['pots'] }): HandState {
+function makeHand(base: Partial<HandState> & { handId: string; street: HandState['street'] }): HandState {
   const pots = base.pots ?? Object.freeze({ total: 0, sidePots: Object.freeze([]) });
-  return Object.freeze({ ...base, pots });
+  return Object.freeze({
+    deck: Object.freeze([]),
+    boardCards: Object.freeze([]),
+    currentBet: 0,
+    minRaise: 10,
+    lastRaiseAmount: 10,
+    lastAggressorSeatIndex: null,
+    actedSeatIndexes: Object.freeze([]),
+    raiseFrozenSeatIndexes: Object.freeze([]),
+    showdownReady: false,
+    isComplete: false,
+    ...base,
+    pots,
+    lastPublicActionsBySeat: base.lastPublicActionsBySeat ?? Object.freeze({}),
+  });
 }
 
 type PlayerRow = {
@@ -610,6 +624,7 @@ describe('returnableUncalled fold-win integration', () => {
       lastRaiseAmount: 10,
       lastAggressorSeatIndex: null,
       actedSeatIndexes: Object.freeze([]),
+      lastPublicActionsBySeat: Object.freeze({}),
       raiseFrozenSeatIndexes: Object.freeze([]),
       showdownReady: false,
       isComplete: true,

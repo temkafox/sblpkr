@@ -14,6 +14,7 @@ import {
   orderOccupiedSeatsForViewer,
   orderRoomPlayersForViewer,
   resolveSeatNickname,
+  resolveSeatStatus,
   resolveViewerServerSeatIndex,
   shouldShowOppBackcards,
 } from './gameStateAdapter';
@@ -418,6 +419,40 @@ describe('gameStateAdapter', () => {
     expect(adapted.seatStatesBySeatIndex[1]?.status).not.toBe('sitout');
   });
 
+  it('maps lastAction kinds to seat HUD status during a hand', () => {
+    const active = (overrides: Partial<WireSeatView>) =>
+      resolveSeatStatus(
+        occupiedSeat(1, 'p-villain', 'Villain', overrides),
+        0,
+        false,
+        true,
+      );
+
+    expect(active({ lastAction: { kind: 'check' } })).toBe('check');
+    expect(active({ lastAction: { kind: 'call', amount: 10 } })).toBe('call');
+    expect(active({ lastAction: { kind: 'raise', amount: 40 } })).toBe('raise');
+    expect(active({ hasFolded: true, lastAction: { kind: 'fold' } })).toBe('fold');
+    expect(
+      active({
+        isAllIn: true,
+        stack: 0,
+        holeCardCount: 2,
+        lastAction: { kind: 'allin', amount: 200 },
+      }),
+    ).toBe('allin');
+    expect(active({ isWinner: true })).not.toBe('winner');
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(1, 'p-villain', 'Villain', { isWinner: true }),
+        null,
+        true,
+        true,
+      ),
+    ).toBe('winner');
+    expect(active({ lastAction: { kind: 'post_sb', amount: 1 } })).toBe('post_sb');
+    expect(active({ lastAction: { kind: 'post_bb', amount: 2 } })).toBe('post_bb');
+  });
+
   it('renders busted sitout only after hand completes', () => {
     const adapted = adaptPlayerGameState(
       baseState({
@@ -436,6 +471,27 @@ describe('gameStateAdapter', () => {
       roomRoster,
     );
     expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('sitout');
+  });
+
+  it('renders busted label when hand complete with zero stack and not sitting out', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', { stack: 400, isWinner: true }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            stack: 0,
+            isSittingOut: false,
+            holeCardCount: null,
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.status).toBe('winner');
+    expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('busted');
   });
 
   it('places viewer at layout seat 0', () => {
@@ -600,6 +656,7 @@ describe('gameStateAdapter', () => {
   it('renders zero-stack player as sitout', () => {
     const adapted = adaptPlayerGameState(
       baseState({
+        activeSeatIndex: 0,
         seats: [
           occupiedSeat(0, 'p-hero', 'Hero', { stack: 150 }),
           occupiedSeat(1, 'p-villain', 'Villain', {

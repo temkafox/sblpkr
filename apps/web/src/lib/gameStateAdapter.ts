@@ -279,22 +279,59 @@ export function shouldShowOppBackcards(
   return seat.holeCards == null || seat.holeCards.length === 0;
 }
 
-function seatStatus(
+function seatLabelBet(seat: WireSeatView): number {
+  const amount = seat.lastAction?.amount;
+  if (amount != null && amount > 0) {
+    return amount;
+  }
+  return seat.currentBet;
+}
+
+/** Maps wire seat + hand context to HUD status token (Phase 7H priority). */
+export function resolveSeatStatus(
   seat: WireSeatView,
   activeSeatIndex: number | null,
   handComplete: boolean,
+  hasActiveHand: boolean,
 ): SeatStateMock['status'] {
-  if (handComplete) {
-    if (seat.hasFolded) return 'fold';
-    if (seat.stack <= 0 || seat.isSittingOut) return 'sitout';
-    return 'idle';
+  if (handComplete && seat.isWinner) {
+    return 'winner';
   }
-  if (seat.hasFolded) return 'fold';
-  if (seat.isAllIn || (seat.stack <= 0 && (seat.holeCardCount ?? 0) > 0)) {
+  if (hasActiveHand && !handComplete && activeSeatIndex === seat.seatIndex) {
+    return 'turn';
+  }
+  if (seat.hasFolded) {
+    return 'fold';
+  }
+  if (
+    hasActiveHand &&
+    !handComplete &&
+    (seat.isAllIn ||
+      (seat.stack <= 0 && (seat.holeCardCount ?? 0) > 0))
+  ) {
     return 'allin';
   }
+
+  const kind = seat.lastAction?.kind;
+  if (kind === 'raise') return 'raise';
+  if (kind === 'call') return 'call';
+  if (kind === 'check') return 'check';
+  if (kind === 'allin') return 'allin';
+  if (kind === 'fold') return 'fold';
+  if (kind === 'post_sb') return 'post_sb';
+  if (kind === 'post_bb') return 'post_bb';
+
+  if (handComplete) {
+    if (seat.isSittingOut) return 'sitout';
+    if (seat.stack <= 0) return 'busted';
+    return 'idle';
+  }
+  if (!hasActiveHand) {
+    if (seat.isSittingOut) return 'sitout';
+    if (seat.stack <= 0) return 'busted';
+    return 'waiting';
+  }
   if (seat.isSittingOut || seat.stack <= 0) return 'sitout';
-  if (activeSeatIndex === seat.seatIndex) return 'turn';
   return 'idle';
 }
 
@@ -474,9 +511,14 @@ export function adaptPlayerGameState(
         ? [seat.holeCards[0]!, seat.holeCards[1]!]
         : null;
     return {
-      status: seatStatus(seat, state.activeSeatIndex, state.handComplete),
-      bet: seat.currentBet,
-      amount: seat.currentBet > 0 ? seat.currentBet : '',
+      status: resolveSeatStatus(
+        seat,
+        state.activeSeatIndex,
+        state.handComplete,
+        true,
+      ),
+      bet: seatLabelBet(seat),
+      amount: seatLabelBet(seat) > 0 ? seatLabelBet(seat) : '',
       showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
       oppHoleCards: revealed,
     };
