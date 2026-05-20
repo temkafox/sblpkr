@@ -20,6 +20,7 @@ const PlayerActionIntentSchema = z.discriminatedUnion('kind', [
 /** Client intent envelope — authoritative validation uses poker-core on the server. */
 
 export const PlayerActionPayloadSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
   action: PlayerActionIntentSchema,
 });
 

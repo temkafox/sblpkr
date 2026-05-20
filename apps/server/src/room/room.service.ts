@@ -116,6 +116,27 @@ export class RoomService {
     return this.sessions.get(socketId) ?? null;
   }
 
+  /** Join-order seat index for a seated player (Phase 6C2). */
+
+  getSeatIndexForPlayer(roomId: string, playerId: string): number | null {
+    const room = this.byId.get(roomId);
+    if (room == null) return null;
+    const idx = room.players.findIndex((p) => p.playerId === playerId);
+    return idx >= 0 ? idx : null;
+  }
+
+  getSeatIndexForSocket(socketId: string, roomId: string): number | null {
+    const session = this.sessions.get(socketId);
+    if (session?.playerId == null || session.roomId !== roomId) {
+      return null;
+    }
+    return this.getSeatIndexForPlayer(roomId, session.playerId);
+  }
+
+  isSocketInRoom(socketId: string, roomId: string): boolean {
+    return this.getSeatIndexForSocket(socketId, roomId) != null;
+  }
+
   registerNickname(
     socketId: string,
     payload: unknown,

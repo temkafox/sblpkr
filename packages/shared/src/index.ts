@@ -12,10 +12,12 @@ export * from './types/chat';
 export * from './types/game-state';
 export * from './types/hand-history';
 export * from './types/room';
+export * from './types/game-errors';
 
 export * from './events/socket-events';
 
 export * from './dto/room.dto';
+export * from './dto/game.dto';
 export * from './dto/action.dto';
 export * from './dto/chat.dto';
 export * from './dto/error.dto';

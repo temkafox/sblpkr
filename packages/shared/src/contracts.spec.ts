@@ -57,6 +57,7 @@ describe('JoinRoomPayloadSchema', () => {
 describe('PlayerActionPayloadSchema', () => {
   it('parses fold intent', () => {
     const out = PlayerActionPayloadSchema.parse({
+      roomId: 'room-1',
       action: { kind: 'fold' },
     });
     expect(out.action.kind).toBe('fold');
@@ -64,6 +65,7 @@ describe('PlayerActionPayloadSchema', () => {
 
   it('parses raise with amount', () => {
     const out = PlayerActionPayloadSchema.parse({
+      roomId: 'room-1',
       action: { kind: 'raise', amount: 50 },
     });
     expect(out.action).toEqual({ kind: 'raise', amount: 50 });
@@ -72,6 +74,7 @@ describe('PlayerActionPayloadSchema', () => {
   it('rejects unknown kind', () => {
     expect(() =>
       PlayerActionPayloadSchema.parse({
+        roomId: 'room-1',
         action: { kind: 'donate' },
       }),
     ).toThrow();
@@ -92,7 +95,7 @@ describe('ChatMessagePayloadSchema', () => {
 
 describe('socket-events', () => {
   it('exports stable non-empty identifiers', () => {
-    expect(Object.keys(SOCKET_EVENTS).length).toBeGreaterThanOrEqual(13);
+    expect(Object.keys(SOCKET_EVENTS).length).toBeGreaterThanOrEqual(14);
     for (const value of Object.values(SOCKET_EVENTS)) {
       expect(typeof value).toBe('string');
       expect(value.length).toBeGreaterThan(8);

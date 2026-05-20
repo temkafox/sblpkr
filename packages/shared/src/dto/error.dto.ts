@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
-import { ROOM_ERROR_CODES } from '../types/room';
+import { SOCKET_ERROR_CODES } from '../types/game-errors';
 
-const [firstRoomErrorCode, ...otherRoomErrorCodes] = ROOM_ERROR_CODES;
+const [firstErrorCode, ...otherErrorCodes] = SOCKET_ERROR_CODES;
 
-export const RoomErrorCodeSchema = z.enum([
-  firstRoomErrorCode,
-  ...otherRoomErrorCodes,
+export const SocketErrorCodeSchema = z.enum([
+  firstErrorCode,
+  ...otherErrorCodes,
 ]);
 
+/** @deprecated Use {@link SocketErrorCodeSchema} — kept for room-only imports. */
+export const RoomErrorCodeSchema = SocketErrorCodeSchema;
+
 export const ServerErrorPayloadSchema = z.object({
-  code: RoomErrorCodeSchema,
+  code: SocketErrorCodeSchema,
   message: z.string().max(512).optional(),
 });
 
