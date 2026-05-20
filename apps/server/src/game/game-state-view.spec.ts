@@ -142,6 +142,68 @@ describe('game-state-view (Phase 6C2)', () => {
     expect(view.pot.total).toBeGreaterThan(0);
   });
 
+  it('mid-hand all-in at zero chips is not sitting out on the wire', () => {
+    let state = huState();
+    const sbSeat = state.table.smallBlindSeatIndex;
+    state = applyAction(state, sbSeat, { kind: 'allin' });
+
+    const room = sampleRoom();
+    const view = PlayerGameStateSchema.parse(toPlayerGameState(state, sbSeat, room));
+    const allInSeat = view.seats[sbSeat]!;
+
+    expect(allInSeat.stack).toBe(0);
+    expect(allInSeat.isAllIn).toBe(true);
+    expect(allInSeat.isSittingOut).toBe(false);
+    expect(view.handComplete).toBe(false);
+  });
+
+  it('classifies all-in showdown as SHOWDOWN when both players are non-folded', () => {
+    let state = huState();
+    const p0 = state.playersById.p0!;
+    const p1 = state.playersById.p1!;
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+        street: 'SHOWDOWN',
+        boardCards: state.hand!.boardCards.length >= 5
+          ? state.hand!.boardCards
+          : Object.freeze([
+              ...state.hand!.boardCards,
+              { r: '2', s: 'c' },
+              { r: '3', s: 'd' },
+              { r: '4', s: 'h' },
+              { r: '5', s: 's' },
+              { r: '6', s: 'c' },
+            ].slice(0, 5)),
+      }),
+      playersById: Object.freeze({
+        p0: Object.freeze({
+          ...p0,
+          chips: 0,
+          isAllIn: true,
+          isSittingOut: true,
+          hasFolded: false,
+        }),
+        p1: Object.freeze({
+          ...p1,
+          chips: 240,
+          isAllIn: true,
+          isSittingOut: false,
+          hasFolded: false,
+        }),
+      }),
+    }) as typeof state;
+
+    expect(isFoldWinHand(state)).toBe(false);
+    const view0 = PlayerGameStateSchema.parse(toPlayerGameState(state, 0, sampleRoom()));
+    expect(view0.handEndKind).toBe('SHOWDOWN');
+    expect(view0.seats[0]!.holeCards).toHaveLength(2);
+    expect(view0.seats[1]!.holeCards).toHaveLength(2);
+  });
+
   it('reveals showdown contestant hole cards after hand completes', () => {
     let state = huState();
     const p0 = state.playersById.p0!;
@@ -220,5 +282,27 @@ describe('game-state-view (Phase 6C2)', () => {
     expect(idle.activeSeatIndex).toBeNull();
     expect(idle.seats[0]!.holeCards).toBeNull();
     expect(idle.seats[0]!.nickname).toBe('Alpha');
+  });
+
+  it('toIdlePlayerGameState reflects rebought chips and clears sit-out', () => {
+    const room = sampleRoom();
+    let state = huState();
+    const p1 = room.players[1]!.playerId;
+    state = Object.freeze({
+      ...state,
+      hand: null,
+      playersById: Object.freeze({
+        ...state.playersById,
+        [p1]: Object.freeze({
+          ...state.playersById[p1]!,
+          chips: 200,
+          isSittingOut: false,
+        }),
+      }),
+    });
+
+    const idle = PlayerGameStateSchema.parse(toIdlePlayerGameState(state, 1, room));
+    expect(idle.seats[1]!.stack).toBe(200);
+    expect(idle.seats[1]!.isSittingOut).toBe(false);
   });
 });

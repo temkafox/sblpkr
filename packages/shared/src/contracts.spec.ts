@@ -10,6 +10,7 @@ import {
   PlayerActionPayloadSchema,
   PROTOCOL_VERSION,
   RegisterNicknamePayloadSchema,
+  RebuyPayloadSchema,
   RoomCodeSchema,
   RoomIdOrCodeParamSchema,
   ServerErrorPayloadSchema,
@@ -126,6 +127,17 @@ describe('ChatMessagePayloadSchema', () => {
     expect(() =>
       ChatMessagePayloadSchema.parse({ message: '   ' }),
     ).toThrow();
+  });
+});
+
+describe('RebuyPayloadSchema', () => {
+  it('parses roomId', () => {
+    const parsed = RebuyPayloadSchema.parse({ roomId: 'room-abc' });
+    expect(parsed.roomId).toBe('room-abc');
+  });
+
+  it('rejects empty roomId', () => {
+    expect(() => RebuyPayloadSchema.parse({ roomId: '' })).toThrow();
   });
 });
 

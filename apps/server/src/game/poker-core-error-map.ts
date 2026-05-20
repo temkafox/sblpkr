@@ -20,8 +20,10 @@ export function mapToSocketErrorCode(err: unknown): {
   message: string;
 } {
   if (err instanceof GameOrchestrationError) {
-    const code = err.code as SocketErrorCode;
-    return { code, message: err.message };
+    return {
+      code: err.code as SocketErrorCode,
+      message: err.message,
+    };
   }
 
   if (err instanceof OutOfTurnError) {

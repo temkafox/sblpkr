@@ -1,7 +1,7 @@
 import type { CoreGameState } from '@neonpoker/poker-core';
 import {
   getAvailableActions,
-  getContestantSeatIndexes,
+  getNonFoldedSeatIndexes,
   getPlayerAtSeat,
   syncPotsFromCommitments,
 } from '@neonpoker/poker-core';
@@ -67,7 +67,7 @@ export function isFoldWinHand(state: CoreGameState): boolean {
   if (hand == null || !hand.isComplete) {
     return false;
   }
-  return getContestantSeatIndexes(syncPotsFromCommitments(state)).length === 1;
+  return getNonFoldedSeatIndexes(syncPotsFromCommitments(state)).length === 1;
 }
 
 function handEndKindForState(state: CoreGameState): HandEndKind | null {
@@ -96,18 +96,18 @@ function shouldRevealHoleCardsAtSeat(
   return player != null && !player.hasFolded && player.holeCards.length > 0;
 }
 
+function isHandComplete(state: CoreGameState): boolean {
+  const hand = state.hand;
+  return hand != null && hand.isComplete;
+}
+
 function holeCardsForSeat(
   state: CoreGameState,
   seatIndex: SeatIndex,
   viewerSeatIndex: SeatIndex | null,
 ): { holeCards: readonly Card[] | null; holeCardCount: number | null } {
   const player = getPlayerAtSeat(state, seatIndex);
-  if (
-    player == null ||
-    player.chips <= 0 ||
-    player.isSittingOut ||
-    player.holeCards.length === 0
-  ) {
+  if (player == null || player.holeCards.length === 0) {
     return { holeCards: null, holeCardCount: null };
   }
 
@@ -118,6 +118,10 @@ function holeCardsForSeat(
       holeCards: [...player.holeCards],
       holeCardCount: count,
     };
+  }
+
+  if (!isHandComplete(state)) {
+    return { holeCards: null, holeCardCount: count };
   }
 
   return { holeCards: null, holeCardCount: count };

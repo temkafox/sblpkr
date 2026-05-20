@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyAction } from './actions';
+import { advanceStreet } from './street';
 import {
   CoreGameState,
   createInitialGameState,
   createSeededRandom,
+  getAvailableActions,
+  getNonFoldedSeatIndexes,
   isBettingRoundComplete,
   needsToAct,
+  resolveShowdown,
   startHand,
 } from '../index';
 
@@ -118,5 +122,109 @@ describe('betting round', () => {
     expect(g.hand?.actedSeatIndexes).toEqual([utgSeat]);
     expect(needsToAct(g, g.table.smallBlindSeatIndex)).toBe(true);
     expect(isBettingRoundComplete(g)).toBe(false);
+  });
+});
+
+describe('all-in at zero chips during active hand', () => {
+  it('keeps all-in player as contestant and off the action clock', () => {
+    let g = huStartedSmallBlinds();
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+
+    g = applyAction(g, sbSeat, { kind: 'allin' });
+
+    const sb = g.playersById.sb!;
+    expect(sb.chips).toBe(0);
+    expect(sb.isAllIn).toBe(true);
+    expect(getNonFoldedSeatIndexes(g)).toContain(sbSeat);
+    expect(needsToAct(g, sbSeat)).toBe(false);
+    expect(g.table.activeSeatIndex).toBe(bbSeat);
+  });
+
+  it('lets opponent call an all-in and run out to showdown', () => {
+    let g = huStartedSmallBlinds();
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+
+    g = applyAction(g, sbSeat, { kind: 'allin' });
+    expect(getAvailableActions(g, bbSeat).canCall).toBe(true);
+
+    g = applyAction(g, bbSeat, { kind: 'call' });
+    g = advanceStreet(g);
+
+    expect(g.hand?.showdownReady).toBe(true);
+    expect(g.hand?.boardCards.length).toBe(5);
+    expect(getNonFoldedSeatIndexes(g).length).toBe(2);
+
+    const resolved = resolveShowdown(g);
+    expect(resolved.hand?.isComplete).toBe(true);
+  });
+});
+
+describe('getNonFoldedSeatIndexes / fold-win vs showdown', () => {
+  it('all-in preflop with two players is not a fold win', () => {
+    const base = createInitialGameState({
+      table: {
+        tableId: 'ai-hu',
+        maxSeats: 6,
+        smallBlind: 5,
+        bigBlind: 10,
+      },
+      players: [
+        { playerId: 's', seatIndex: 0, startingChips: 120 },
+        { playerId: 'b', seatIndex: 3, startingChips: 120 },
+      ],
+    });
+
+    let g = startHand(
+      Object.freeze({
+        ...base,
+        table: Object.freeze({ ...base.table, dealerSeatIndex: 0 }),
+      }),
+      { rng: createSeededRandom('ai-pf') },
+    );
+
+    g = applyAction(g, g.table.smallBlindSeatIndex, { kind: 'allin' });
+    g = applyAction(g, g.table.bigBlindSeatIndex, { kind: 'call' });
+    g = advanceStreet(g);
+
+    expect(g.hand?.showdownReady).toBe(true);
+    expect(g.hand?.boardCards.length).toBe(5);
+    expect(getNonFoldedSeatIndexes(g).length).toBe(2);
+
+    const resolved = resolveShowdown(g);
+    expect(resolved.hand?.isComplete).toBe(true);
+    expect(getNonFoldedSeatIndexes(resolved).length).toBe(2);
+  });
+
+  it('fold after opponent all-in leaves one non-folded player', () => {
+    const base = createInitialGameState({
+      table: {
+        tableId: 'ai-fold',
+        maxSeats: 6,
+        smallBlind: 5,
+        bigBlind: 10,
+      },
+      players: [
+        { playerId: 's', seatIndex: 0, startingChips: 120 },
+        { playerId: 'b', seatIndex: 3, startingChips: 120 },
+      ],
+    });
+
+    let g = startHand(
+      Object.freeze({
+        ...base,
+        table: Object.freeze({ ...base.table, dealerSeatIndex: 0 }),
+      }),
+      { rng: createSeededRandom('ai-fold') },
+    );
+
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+    g = applyAction(g, sbSeat, { kind: 'allin' });
+    g = applyAction(g, bbSeat, { kind: 'fold' });
+
+    expect(getNonFoldedSeatIndexes(g).length).toBe(1);
+    expect(isBettingRoundComplete(g)).toBe(true);
   });
 });

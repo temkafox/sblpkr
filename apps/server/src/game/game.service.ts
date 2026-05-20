@@ -12,11 +12,13 @@ import { randomUUID } from 'node:crypto';
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
 import { toCorePlayerAction } from './action-mapper';
+import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
 import { buildHandResultPayload } from './hand-result';
 import {
   applySeatEligibility,
+  clearCompletedHandForWaiting,
   countEligiblePlayers,
   foldDepartedPlayers,
   syncTableToRoom,
@@ -51,10 +53,12 @@ export class GameService {
   getGameState(roomId: string): CoreGameState {
     const room = this.requireRoom(roomId);
     const existing = this.tableService.getTableState(roomId);
-    if (existing != null) {
-      return existing;
+    if (existing == null) {
+      return this.tableService.ensureTableForRoom(room);
     }
-    return this.tableService.ensureTableForRoom(room);
+    const synced = applySeatEligibility(syncTableToRoom(room, existing));
+    this.tableService.setTableState(roomId, synced);
+    return synced;
   }
 
   startHand(roomId: string): CoreGameState {
@@ -104,6 +108,81 @@ export class GameService {
     this.tableService.setTableState(roomId, started);
     this.tableService.clearHandResult(roomId);
     return started;
+  }
+
+  /** MVP rebuy — restores one busted player to {@link DEFAULT_REBUY_CHIPS}; does not start a hand. */
+  rebuy(roomId: string, seatIndex: SeatIndex): CoreGameState {
+    const room = this.requireRoom(roomId);
+    const seat = room.players[seatIndex];
+    if (seat == null) {
+      throw new GameOrchestrationError(
+        'NOT_JOINED',
+        'Player is not seated in this room',
+      );
+    }
+
+    let state = this.tableService.getTableState(roomId);
+    if (state == null) {
+      state = this.tableService.ensureTableForRoom(room);
+    }
+    state = syncTableToRoom(room, state);
+
+    const hand = state.hand;
+    if (hand != null && !hand.isComplete) {
+      throw new GameOrchestrationError(
+        'HAND_IN_PROGRESS',
+        'Cannot rebuy during an active hand',
+      );
+    }
+
+    const playerId = state.table.seats[seatIndex]?.playerId;
+    if (playerId == null || playerId !== seat.playerId) {
+      throw new GameOrchestrationError(
+        'NOT_JOINED',
+        'Player is not seated at this table',
+      );
+    }
+
+    const player = state.playersById[playerId];
+    if (player == null) {
+      throw new GameOrchestrationError(
+        'NOT_JOINED',
+        'Player not found at table',
+      );
+    }
+
+    if (player.chips > 0) {
+      throw new GameOrchestrationError(
+        'NOT_BUSTED',
+        'Rebuy is only available when out of chips',
+      );
+    }
+
+    const playersById: Record<string, (typeof state.playersById)[string]> =
+      Object.create(null);
+    for (const pid of Object.keys(state.playersById)) {
+      playersById[pid] = state.playersById[pid]!;
+    }
+    playersById[playerId] = Object.freeze({
+      ...player,
+      chips: DEFAULT_REBUY_CHIPS,
+      isSittingOut: false,
+      holeCards: Object.freeze([]),
+      currentBet: 0,
+      totalCommitted: 0,
+      hasFolded: false,
+      isAllIn: false,
+    });
+
+    let next = Object.freeze({
+      ...state,
+      playersById: Object.freeze(playersById),
+    });
+    next = applySeatEligibility(syncTableToRoom(room, next));
+    next = clearCompletedHandForWaiting(next);
+    this.tableService.setTableState(roomId, next);
+    this.tableService.clearHandResult(roomId);
+    return next;
   }
 
   applyPlayerAction(

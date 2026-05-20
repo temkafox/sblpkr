@@ -8,6 +8,7 @@ import {
   CLIENT_PLAYER_ACTION,
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REBUY,
   CLIENT_START_HAND,
   PlayerActionPayloadSchema,
   PlayerGameStateSchema,
@@ -21,6 +22,7 @@ import {
 import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
+import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameBroadcastService } from './game-broadcast';
 import { GameService } from './game.service';
 import { containsPrivateEngineFields } from './game-state-view';
@@ -66,6 +68,9 @@ function attachGatewayHandlers(io: Server, gateway: RoomGateway): void {
     socket.on(CLIENT_START_HAND, (payload: unknown) => {
       gateway.handleStartHand(socket, payload);
     });
+    socket.on(CLIENT_REBUY, (payload: unknown) => {
+      gateway.handleRebuy(socket, payload);
+    });
     socket.on(CLIENT_PLAYER_ACTION, (payload: unknown) => {
       gateway.handlePlayerAction(socket, payload);
     });
@@ -80,6 +85,7 @@ describe('Game gateway (Phase 6C2)', () => {
   let io: Server;
   let gateway: RoomGateway;
   let roomService: RoomService;
+  let tableService: TableService;
   let port = 0;
 
   beforeAll(async () => {
@@ -94,7 +100,7 @@ describe('Game gateway (Phase 6C2)', () => {
         return `aaaaaaaa-aaaa-4aaa-8aaa-${suffix}`;
       },
     });
-    const tableService = new TableService();
+    tableService = new TableService();
     const gameService = GameService.forTest({
       roomService,
       tableService,
@@ -342,6 +348,47 @@ describe('Game gateway (Phase 6C2)', () => {
     expect(result.winnerSeatIndexes).toContain(active);
     expect(result.totalAwarded).toBeGreaterThan(0);
     expect(result.awardedAmountsBySeatIndex[String(active)]).toBeGreaterThan(0);
+
+    a.disconnect();
+    b.disconnect();
+  });
+
+  it('CLIENT_REBUY restores busted player and broadcasts SERVER_GAME_STATE', async () => {
+    const room = roomService.createRoom({ maxSeats: 6 });
+    const { a, b } = await seatTwo(room.roomId);
+    const roomState = roomService.getRoom(room.roomId)!;
+    const bustedId = roomState.players[1]!.playerId;
+    const winnerId = roomState.players[0]!.playerId;
+
+    let core = tableService.ensureTableForRoom(roomState);
+    core = Object.freeze({
+      ...core,
+      playersById: Object.freeze({
+        [winnerId]: Object.freeze({
+          ...core.playersById[winnerId]!,
+          chips: 400,
+        }),
+        [bustedId]: Object.freeze({
+          ...core.playersById[bustedId]!,
+          chips: 0,
+          isSittingOut: true,
+        }),
+      }),
+    });
+    tableService.setTableState(room.roomId, core);
+
+    const rebuyA = waitForEvent(a, SERVER_GAME_STATE);
+    const rebuyB = waitForEvent(b, SERVER_GAME_STATE);
+    b.emit(CLIENT_REBUY, { roomId: room.roomId });
+
+    const viewB = PlayerGameStateSchema.parse(await rebuyB);
+    const viewA = PlayerGameStateSchema.parse(await rebuyA);
+    expect(viewB.seats[1]!.stack).toBe(DEFAULT_REBUY_CHIPS);
+    expect(viewB.seats[1]!.isSittingOut).toBe(false);
+    expect(viewA.seats[0]!.stack).toBe(400);
+    expect(viewA.seats[1]!.isSittingOut).toBe(false);
+    expect(viewA.handId).toBeNull();
+    expect(viewB.handId).toBeNull();
 
     a.disconnect();
     b.disconnect();

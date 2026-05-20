@@ -3,6 +3,7 @@ import {
   CLIENT_LEAVE_ROOM,
   CLIENT_PLAYER_ACTION,
   CLIENT_REGISTER_NICKNAME,
+  CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_START_HAND,
   SERVER_ERROR,
@@ -236,6 +237,12 @@ export function requestGameState(roomId: string): void {
 
 export function startHand(roomId: string): void {
   socket?.emit(CLIENT_START_HAND, { roomId });
+}
+
+export function rebuy(roomId: string): void {
+  useGameStore.getState().setGameLoading(true);
+  useGameStore.getState().setGameError(null);
+  socket?.emit(CLIENT_REBUY, { roomId });
 }
 
 export function sendPlayerAction(

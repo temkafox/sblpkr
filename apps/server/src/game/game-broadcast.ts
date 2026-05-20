@@ -19,6 +19,30 @@ export class GameBroadcastService {
     private readonly tableService: TableService,
   ) {}
 
+  /** Per-viewer idle snapshots (no active hand UI) — used after rebuy. */
+  emitIdleGameStateToRoom(
+    server: Server,
+    roomId: string,
+    state: CoreGameState,
+  ): void {
+    const room = this.roomService.getRoom(roomId);
+    if (room == null) return;
+
+    for (const member of room.players) {
+      const seatIndex = this.roomService.getSeatIndexForPlayer(
+        roomId,
+        member.playerId,
+      );
+      if (seatIndex == null) continue;
+
+      const socket = server.sockets.sockets.get(member.socketId);
+      if (socket == null) continue;
+
+      const view = toIdlePlayerGameState(state, seatIndex, room);
+      socket.emit(SERVER_GAME_STATE, view);
+    }
+  }
+
   emitGameStateToRoom(
     server: Server,
     roomId: string,
@@ -88,7 +112,9 @@ export class GameBroadcastService {
       return;
     }
 
-    const state = this.tableService.ensureTableForRoom(room);
+    const state =
+      this.tableService.reconcileTableWithRoom(room) ??
+      this.tableService.ensureTableForRoom(room);
 
     for (const member of room.players) {
       const seatIndex = this.roomService.getSeatIndexForPlayer(

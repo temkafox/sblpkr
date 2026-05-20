@@ -5,7 +5,9 @@ import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
   boardRevealFromStreet,
+  countEligibleForNextHand,
   countSeatsWithChips,
+  hasExplicitBustedStackInIdleState,
   isActiveHand,
   NO_HAND_SEAT_INDEX,
   occupiedCountToLayoutPreset,
@@ -190,6 +192,48 @@ describe('gameStateAdapter', () => {
     expect(lobby.playersBySeatIndex[0]?.stack).toBe(100);
   });
 
+  it('lobby falls back to starting stack when runtime entry is missing pre-hand', () => {
+    const idle = baseState({
+      handId: null,
+      street: null,
+      seats: [
+        occupiedSeat(0, 'p-hero', 'Hero', { stack: 200 }),
+        ...Array.from({ length: 8 }, (_, i) => emptySeat(i + 1)),
+      ],
+    });
+    const lobby = adaptRoomLobbyState(roomRoster, 'ljhh', idle);
+    expect(lobby.playersBySeatIndex[0]?.stack).toBe(200);
+    expect(lobby.playersBySeatIndex[1]?.stack).toBe(200);
+  });
+
+  it('countEligibleForNextHand assumes joined players before first hand', () => {
+    const idle = baseState({
+      handId: null,
+      seats: [
+        occupiedSeat(0, 'p-hero', 'Hero', { stack: 200 }),
+        ...Array.from({ length: 8 }, (_, i) => emptySeat(i + 1)),
+      ],
+    });
+    expect(countEligibleForNextHand(idle, roomRoster)).toBe(2);
+    expect(hasExplicitBustedStackInIdleState(idle, roomRoster)).toBe(false);
+  });
+
+  it('countEligibleForNextHand uses explicit stacks after bust', () => {
+    const idle = baseState({
+      handId: null,
+      seats: [
+        occupiedSeat(0, 'p-hero', 'Hero', { stack: 400 }),
+        occupiedSeat(1, 'p-villain', 'Villain', {
+          stack: 0,
+          isSittingOut: true,
+        }),
+        ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+      ],
+    });
+    expect(hasExplicitBustedStackInIdleState(idle, roomRoster)).toBe(true);
+    expect(countEligibleForNextHand(idle, roomRoster)).toBe(1);
+  });
+
   it('orders room players with viewer first', () => {
     const ordered = orderRoomPlayersForViewer(roomRoster.players, 'ASD');
     expect(ordered.map((p) => p.nickname)).toEqual(['ASD', 'ljhh']);
@@ -204,6 +248,43 @@ describe('gameStateAdapter', () => {
     const state = baseState();
     expect(shouldShowOppBackcards(state.seats[1]!, 1)).toBe(true);
     expect(state.seats[1]!.holeCards).toBeNull();
+  });
+
+  it('reveals full board when hand completes as SHOWDOWN', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        handEndKind: 'SHOWDOWN',
+        street: 'SHOWDOWN',
+        boardCards: [
+          { r: '2', s: 'c' },
+          { r: '3', s: 'd' },
+          { r: '4', s: 'h' },
+          { r: '5', s: 's' },
+          { r: '6', s: 'c' },
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.boardReveal).toBe(5);
+  });
+
+  it('does not show ALL-IN status after hand completes', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        handEndKind: 'SHOWDOWN',
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', { isAllIn: true }),
+          occupiedSeat(1, 'p-villain', 'Villain', { isAllIn: true }),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.status).toBe('idle');
+    expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('idle');
   });
 
   it('maps revealed opponent hole cards after showdown completion', () => {
@@ -309,6 +390,52 @@ describe('gameStateAdapter', () => {
     );
     expect(nextHand.seatStatesBySeatIndex[1]?.oppHoleCards).toBeNull();
     expect(nextHand.seatStatesBySeatIndex[1]?.showOppBackcards).toBe(true);
+  });
+
+  it('renders active-hand zero-stack all-in as allin, not sitout', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            stack: 0,
+            isAllIn: true,
+            isSittingOut: true,
+            holeCardCount: 2,
+            currentBet: 200,
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            stack: 198,
+            holeCardCount: 2,
+            currentBet: 2,
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.status).toBe('allin');
+    expect(adapted.seatStatesBySeatIndex[1]?.status).not.toBe('sitout');
+  });
+
+  it('renders busted sitout only after hand completes', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', { stack: 400 }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            stack: 0,
+            isSittingOut: true,
+            holeCardCount: null,
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('sitout');
   });
 
   it('places viewer at layout seat 0', () => {
@@ -432,6 +559,42 @@ describe('gameStateAdapter', () => {
         }),
       ),
     ).toBe(1);
+  });
+
+  it('countSeatsWithChips ignores sitting-out players even with chips', () => {
+    expect(
+      countSeatsWithChips(
+        baseState({
+          seats: [
+            occupiedSeat(0, 'p-hero', 'Hero', { stack: 200 }),
+            occupiedSeat(1, 'p-villain', 'Villain', {
+              stack: 200,
+              isSittingOut: true,
+            }),
+            ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+          ],
+        }),
+      ),
+    ).toBe(1);
+  });
+
+  it('countSeatsWithChips counts two eligible players after rebuy', () => {
+    expect(
+      countSeatsWithChips(
+        baseState({
+          handId: null,
+          handComplete: false,
+          seats: [
+            occupiedSeat(0, 'p-hero', 'Hero', { stack: 400 }),
+            occupiedSeat(1, 'p-villain', 'Villain', {
+              stack: 200,
+              isSittingOut: false,
+            }),
+            ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+          ],
+        }),
+      ),
+    ).toBe(2);
   });
 
   it('renders zero-stack player as sitout', () => {

@@ -1,7 +1,7 @@
 import type { CoreGameState, ShowdownResult } from '@neonpoker/poker-core';
 import {
   computeShowdownResult,
-  getContestantSeatIndexes,
+  getNonFoldedSeatIndexes,
   HandCategory,
   syncPotsFromCommitments,
 } from '@neonpoker/poker-core';
@@ -100,7 +100,7 @@ export function computeHandResultPayload(
   if (hand == null) return null;
 
   const synced = syncPotsFromCommitments(state);
-  const isFoldWin = getContestantSeatIndexes(synced).length === 1;
+  const isFoldWin = getNonFoldedSeatIndexes(synced).length === 1;
 
   try {
     const result = computeShowdownResult(state);

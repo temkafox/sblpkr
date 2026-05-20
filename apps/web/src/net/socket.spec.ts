@@ -1,5 +1,6 @@
 import {
   CLIENT_PLAYER_ACTION,
+  CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_START_HAND,
   SERVER_ERROR,
@@ -21,6 +22,7 @@ import { useSessionStore } from '../state/sessionStore';
 import {
   connectSocket,
   joinRoom,
+  rebuy,
   requestGameState,
   resetSocketClientForTests,
   sendPlayerAction,
@@ -318,6 +320,40 @@ describe('socket client', () => {
       roomId: roomState.roomId,
     });
     expect(useGameStore.getState().isGameLoading).toBe(true);
+  });
+
+  it('rebuy emits CLIENT_REBUY and sets loading without changing stack', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    useGameStore.getState().setGameState({
+      ...gameState,
+      viewerSeatIndex: 0,
+      seats: [
+        {
+          seatIndex: 0,
+          playerId: 'p0',
+          nickname: 'Hero',
+          stack: 0,
+          currentBet: 0,
+          hasFolded: false,
+          isAllIn: false,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+
+    rebuy(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_REBUY, {
+      roomId: roomState.roomId,
+    });
+    expect(useGameStore.getState().isGameLoading).toBe(true);
+    expect(useGameStore.getState().gameState?.seats[0]?.stack).toBe(0);
   });
 
   it('startHand emits CLIENT_START_HAND', async () => {

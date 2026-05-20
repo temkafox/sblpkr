@@ -3,7 +3,7 @@ import {
   advanceStreet,
   canAdvanceStreet,
   computeShowdownResult,
-  getContestantSeatIndexes,
+  getNonFoldedSeatIndexes,
   isBettingRoundComplete,
   resolveShowdown,
   syncPotsFromCommitments,
@@ -19,7 +19,7 @@ function resolveWithTracking(
   state: CoreGameState,
 ): ProgressGameStateResult {
   const synced = syncPotsFromCommitments(state);
-  const isFoldWin = getContestantSeatIndexes(synced).length === 1;
+  const isFoldWin = getNonFoldedSeatIndexes(synced).length === 1;
   const showdownResult = computeShowdownResult(state);
 
   return {

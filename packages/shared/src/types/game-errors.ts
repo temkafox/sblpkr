@@ -8,6 +8,8 @@ export const GAME_ERROR_CODES = [
   'TABLE_NOT_FOUND',
   'NOT_ENOUGH_PLAYERS',
   'HAND_ALREADY_ACTIVE',
+  'NOT_BUSTED',
+  'HAND_IN_PROGRESS',
 ] as const;
 
 export type GameErrorCode = (typeof GAME_ERROR_CODES)[number];

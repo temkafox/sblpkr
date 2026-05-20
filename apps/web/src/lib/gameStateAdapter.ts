@@ -32,7 +32,19 @@ export function isActiveHand(
   return state?.handId != null && state.handId.length > 0;
 }
 
-/** Seated players with stack > 0 (eligible for next hand in MVP). */
+/** Viewer stack from authoritative game state (server seat index). */
+export function viewerSeatStack(
+  state: PlayerGameState | null | undefined,
+  viewerSeatIndex: number | null,
+): number | null {
+  if (state == null || viewerSeatIndex == null) {
+    return null;
+  }
+  const seat = state.seats.find((s) => s.seatIndex === viewerSeatIndex);
+  return seat?.playerId != null ? seat.stack : null;
+}
+
+/** Seated players eligible for the next hand (stack > 0, not sitting out). */
 export function countSeatsWithChips(
   state: PlayerGameState | null | undefined,
 ): number {
@@ -40,8 +52,59 @@ export function countSeatsWithChips(
     return 0;
   }
   return state.seats.filter(
-    (seat) => seat.playerId != null && seat.stack > 0,
+    (seat) =>
+      seat.playerId != null && seat.stack > 0 && !seat.isSittingOut,
   ).length;
+}
+
+/** True when a seat view represents a player who can start the next hand. */
+export function isSeatEligibleForNextHand(seat: WireSeatView): boolean {
+  return seat.playerId != null && seat.stack > 0 && !seat.isSittingOut;
+}
+
+/**
+ * True when idle game state includes an explicit zero stack for a roster player
+ * (post-bust), as opposed to a missing/partial runtime entry before first hand.
+ */
+export function hasExplicitBustedStackInIdleState(
+  state: PlayerGameState,
+  room: RoomStatePayload,
+): boolean {
+  if (isActiveHand(state)) {
+    return true;
+  }
+  const rosterIds = new Set(room.players.map((p) => p.playerId));
+  for (const seat of state.seats) {
+    if (seat.playerId == null || !rosterIds.has(seat.playerId)) {
+      continue;
+    }
+    if (seat.stack <= 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Eligible players for starting the next hand.
+ * Pre-first-hand lobby assumes joined players have {@link LOBBY_PLACEHOLDER_STACK}
+ * until the server reports an explicit bust (stack <= 0).
+ */
+export function countEligibleForNextHand(
+  gameState: PlayerGameState | null | undefined,
+  room: RoomStatePayload | null,
+): number {
+  const playerCount = room?.players.length ?? 0;
+  if (gameState == null || room == null) {
+    return playerCount;
+  }
+  if (
+    isActiveHand(gameState) ||
+    hasExplicitBustedStackInIdleState(gameState, room)
+  ) {
+    return countSeatsWithChips(gameState);
+  }
+  return playerCount;
 }
 
 function preHandMockGameState(preset: SeatCount): MockGameState {
@@ -219,12 +282,30 @@ export function shouldShowOppBackcards(
 function seatStatus(
   seat: WireSeatView,
   activeSeatIndex: number | null,
+  handComplete: boolean,
 ): SeatStateMock['status'] {
-  if (seat.stack <= 0 || seat.isSittingOut) return 'sitout';
+  if (handComplete) {
+    if (seat.hasFolded) return 'fold';
+    if (seat.stack <= 0 || seat.isSittingOut) return 'sitout';
+    return 'idle';
+  }
   if (seat.hasFolded) return 'fold';
-  if (seat.isAllIn) return 'allin';
+  if (seat.isAllIn || (seat.stack <= 0 && (seat.holeCardCount ?? 0) > 0)) {
+    return 'allin';
+  }
+  if (seat.isSittingOut || seat.stack <= 0) return 'sitout';
   if (activeSeatIndex === seat.seatIndex) return 'turn';
   return 'idle';
+}
+
+function boardRevealForState(state: PlayerGameState): BoardReveal {
+  if (state.handComplete && state.handEndKind === 'SHOWDOWN') {
+    return 5;
+  }
+  if (state.handComplete && state.boardCards.length >= 5) {
+    return 5;
+  }
+  return boardRevealFromStreet(state.street);
 }
 
 function padBoard(cards: readonly CardModel[]): CardModel[] {
@@ -298,7 +379,9 @@ export function adaptRoomLobbyState(
   const playersBySeatIndex: PlayerMock[] = ordered.map((member, layoutIdx) => ({
     id: member.playerId,
     name: member.nickname,
-    stack: stacks.get(member.playerId) ?? LOBBY_PLACEHOLDER_STACK,
+    stack: stacks.has(member.playerId)
+      ? stacks.get(member.playerId)!
+      : LOBBY_PLACEHOLDER_STACK,
     ring: RINGS[layoutIdx % RINGS.length]!,
     init: member.nickname.slice(0, 2).toUpperCase(),
     avatar: layoutIdx === 0 ? '/assets/avatar-1.png' : null,
@@ -391,7 +474,7 @@ export function adaptPlayerGameState(
         ? [seat.holeCards[0]!, seat.holeCards[1]!]
         : null;
     return {
-      status: seatStatus(seat, state.activeSeatIndex),
+      status: seatStatus(seat, state.activeSeatIndex, state.handComplete),
       bet: seat.currentBet,
       amount: seat.currentBet > 0 ? seat.currentBet : '',
       showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
@@ -430,7 +513,7 @@ export function adaptPlayerGameState(
     potAmount: state.pot.total,
     showPotChips: state.pot.total > 0,
     boardCards: padBoard(state.boardCards),
-    boardReveal: boardRevealFromStreet(state.street),
+    boardReveal: boardRevealForState(state),
     heroHoleCards,
     handHistory: [],
     chatMessages: [],

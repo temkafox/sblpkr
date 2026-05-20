@@ -63,6 +63,51 @@
   pointer-events: none;
 }
 
+.table-page__rebuy {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+}
+
+.table-page__rebuy-btn {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 10px 20px;
+  color: rgba(12, 24, 40, 0.95);
+  background: linear-gradient(180deg, rgba(34, 211, 255, 0.95), rgba(14, 165, 233, 0.88));
+  border: 1px solid rgba(34, 211, 255, 0.6);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(34, 211, 255, 0.35);
+}
+
+.table-page__rebuy-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.table-page__rebuy-error {
+  position: absolute;
+  top: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+  margin: 0;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 210, 220, 0.95);
+  background: rgba(40, 8, 16, 0.88);
+  border: 1px solid rgba(255, 46, 107, 0.45);
+  border-radius: var(--r-md);
+  pointer-events: none;
+}
+
 .table-page__pregame {
   position: absolute;
   top: 72px;

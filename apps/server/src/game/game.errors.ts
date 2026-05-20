@@ -3,7 +3,10 @@ export type GameErrorCode =
   | 'TABLE_NOT_FOUND'
   | 'NOT_ENOUGH_PLAYERS'
   | 'NO_ACTIVE_HAND'
-  | 'HAND_ALREADY_ACTIVE';
+  | 'HAND_ALREADY_ACTIVE'
+  | 'NOT_JOINED'
+  | 'NOT_BUSTED'
+  | 'HAND_IN_PROGRESS';
 
 export class GameOrchestrationError extends Error {
   readonly code: GameErrorCode;

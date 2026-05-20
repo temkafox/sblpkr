@@ -12,9 +12,11 @@ import {
   CLIENT_LEAVE_ROOM,
   CLIENT_PLAYER_ACTION,
   CLIENT_REGISTER_NICKNAME,
+  CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_START_HAND,
   PlayerActionPayloadSchema,
+  RebuyPayloadSchema,
   RequestGameStatePayloadSchema,
   StartHandPayloadSchema,
   SERVER_ERROR,
@@ -27,7 +29,10 @@ import type { Server, Socket } from 'socket.io';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { GameService } from '../game/game.service';
 import { mapToSocketErrorCode } from '../game/poker-core-error-map';
-import { toPlayerGameState } from '../game/game-state-view';
+import {
+  toIdlePlayerGameState,
+  toPlayerGameState,
+} from '../game/game-state-view';
 import { LOCAL_DEV_SOCKET_CORS } from '../cors.config';
 import { RoomService } from './room.service';
 
@@ -77,6 +82,7 @@ export class RoomGateway implements OnGatewayDisconnect {
 
     await client.join(result.roomId);
     this.broadcastRoomState(result.roomId);
+    this.broadcastIdleTableStateIfNoHand(result.roomId);
   }
 
   @SubscribeMessage(CLIENT_LEAVE_ROOM)
@@ -93,6 +99,43 @@ export class RoomGateway implements OnGatewayDisconnect {
     if (result.roomId != null) {
       void client.leave(result.roomId);
       this.afterRoomMembershipChange(result.roomId);
+    }
+  }
+
+  @SubscribeMessage(CLIENT_REBUY)
+  handleRebuy(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): void {
+    const parsed = RebuyPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      this.emitError(
+        client,
+        'INVALID_PAYLOAD',
+        parsed.error.issues[0]?.message ?? 'Invalid rebuy payload',
+      );
+      return;
+    }
+
+    const roomId = this.resolveRoomId(parsed.data.roomId);
+    if (roomId == null) {
+      this.emitError(client, 'ROOM_NOT_FOUND', 'Room not found');
+      return;
+    }
+
+    const seatIndex = this.roomService.getSeatIndexForSocket(client.id, roomId);
+    if (seatIndex == null) {
+      this.emitError(client, 'NOT_JOINED', 'Join the room before rebuy');
+      return;
+    }
+
+    try {
+      const state = this.gameService.rebuy(roomId, seatIndex);
+      this.broadcastRoomState(roomId);
+      this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
+    } catch (err) {
+      const mapped = mapToSocketErrorCode(err);
+      this.emitError(client, mapped.code, mapped.message);
     }
   }
 
@@ -201,7 +244,10 @@ export class RoomGateway implements OnGatewayDisconnect {
     try {
       const state = this.gameService.getGameState(roomId);
       const room = this.roomService.getRoom(roomId);
-      const view = toPlayerGameState(state, seatIndex, room);
+      const view =
+        state.hand == null
+          ? toIdlePlayerGameState(state, seatIndex, room)
+          : toPlayerGameState(state, seatIndex, room);
       client.emit(SERVER_GAME_STATE, view);
       this.gameBroadcast.emitHandResultToClient(client, roomId, state);
     } catch (err) {
@@ -231,6 +277,26 @@ export class RoomGateway implements OnGatewayDisconnect {
     const state = this.gameService.reconcileAfterRosterChange(roomId);
     if (state != null) {
       this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      return;
+    }
+
+    this.broadcastIdleTableStateIfNoHand(roomId);
+  }
+
+  /** Keeps idle lobby stacks aligned when roster grows before the first hand. */
+  private broadcastIdleTableStateIfNoHand(roomId: string): void {
+    const room = this.roomService.getRoom(roomId);
+    if (room == null || room.players.length === 0) {
+      return;
+    }
+
+    try {
+      const state = this.gameService.getGameState(roomId);
+      if (state.hand == null) {
+        this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
+      }
+    } catch {
+      /* room removed */
     }
   }
 

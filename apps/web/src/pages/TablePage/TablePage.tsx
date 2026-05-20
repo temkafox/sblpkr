@@ -14,14 +14,21 @@ import { RightSidebar } from '../../components/sidebar/RightSidebar';
 import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
-  countSeatsWithChips,
+  countEligibleForNextHand,
   createWaitingLiveTableView,
   resolveViewerServerSeatIndex,
   isActiveHand,
+  viewerSeatStack,
 } from '../../lib/gameStateAdapter';
+import { formatChips } from '../../lib/formatChips';
 import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
 import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
-import { requestGameState, sendPlayerAction, startHand } from '../../net/socket';
+import {
+  rebuy,
+  requestGameState,
+  sendPlayerAction,
+  startHand,
+} from '../../net/socket';
 import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
@@ -46,8 +53,7 @@ export function TablePage() {
     gameStateMatchesRoomRoster(gameState, roomState);
   const enoughPlayersForHand =
     roomState == null || playerCount >= minPlayersToStart;
-  const eligibleForHand =
-    gameState != null ? countSeatsWithChips(gameState) : playerCount;
+  const eligibleForHand = countEligibleForNextHand(gameState, roomState);
   const enoughChipsForHand = eligibleForHand >= minPlayersToStart;
   const hasActiveHand =
     isActiveHand(gameState) &&
@@ -73,6 +79,11 @@ export function TablePage() {
 
   useEffect(() => {
     if (!roomId) return;
+    const cached = useGameStore.getState().gameState;
+    if (cached?.tableId !== roomId) {
+      useGameStore.getState().clearGameState();
+      useGameStore.getState().setGameLoading(true);
+    }
     requestGameState(roomId);
   }, [roomId]);
 
@@ -116,8 +127,20 @@ export function TablePage() {
   const waitingForChips =
     isLiveRoom &&
     !handInProgress &&
+    !handComplete &&
     playerCount >= minPlayersToStart &&
     !enoughChipsForHand;
+
+  const viewerStack = viewerSeatStack(gameState, viewerSeatIndex);
+  const canRebuy =
+    isLiveRoom &&
+    connectionStatus === 'connected' &&
+    roomId != null &&
+    !handInProgress &&
+    viewerStack != null &&
+    viewerStack <= 0;
+
+  const rebuyAmount = 200;
 
   const handleStartHand = useCallback(() => {
     if (!roomId || !canStartHand) return;
@@ -128,6 +151,11 @@ export function TablePage() {
     if (!roomId || !canStartNextHand) return;
     startHand(roomId);
   }, [roomId, canStartNextHand]);
+
+  const handleRebuy = useCallback(() => {
+    if (!roomId || !canRebuy) return;
+    rebuy(roomId);
+  }, [roomId, canRebuy]);
 
   const emitAction = useCallback(
     (action: Parameters<typeof sendPlayerAction>[1]) => {
@@ -185,6 +213,11 @@ export function TablePage() {
       ? gameError
       : null;
 
+  const rebuyErrorLabel =
+    !handInProgress && gameError != null && gameError.length > 0
+      ? gameError
+      : null;
+
   const roomMeta =
     roomState != null
       ? formatRoomMetaLine(roomState, hasActiveHand ? gameState : null)
@@ -202,10 +235,27 @@ export function TablePage() {
           {actionErrorLabel}
         </p>
       ) : null}
+      {rebuyErrorLabel ? (
+        <p className="table-page__rebuy-error" aria-live="polite">
+          {rebuyErrorLabel}
+        </p>
+      ) : null}
       {roomMeta ? (
         <p className="table-page__room-meta" aria-live="polite">
           {roomMeta}
         </p>
+      ) : null}
+      {canRebuy ? (
+        <div className="table-page__rebuy">
+          <button
+            type="button"
+            className="table-page__rebuy-btn"
+            onClick={handleRebuy}
+            disabled={isGameLoading}
+          >
+            Rebuy ${formatChips(rebuyAmount)}
+          </button>
+        </div>
       ) : null}
       {canStartHand ? (
         <div className="table-page__pregame">

@@ -1,6 +1,7 @@
 import type { HandState } from '../domain/hand-state';
 
 import type { CoreGameState } from '../domain/game-state';
+import type { PlayerRuntimeState } from '../domain/player-state';
 import type { SeatIndex } from '../domain/seat';
 import { getPlayerAtSeat } from './seat-utils';
 
@@ -18,17 +19,33 @@ export function resetActedAfterAggression(seat: SeatIndex): readonly SeatIndex[]
   return Object.freeze([seat]);
 }
 
-/** Still contesting the pot — seated, not folded, not sitting out. */
+/** Dealt into the current hand and not folded (includes all-in at 0 chips). */
+export function isContestantInCurrentHand(
+  player: PlayerRuntimeState | null,
+): player is PlayerRuntimeState {
+  return player != null && !player.hasFolded;
+}
 
 export function getContestantSeatIndexes(state: CoreGameState): SeatIndex[] {
+  return getNonFoldedSeatIndexes(state);
+}
+
+/** Players who have not folded this hand (includes all-in; sitting out is not a fold). */
+
+export function getNonFoldedSeatIndexes(state: CoreGameState): SeatIndex[] {
   const out: SeatIndex[] = [];
   for (const s of state.table.seats) {
     const p = getPlayerAtSeat(state, s.seatIndex);
-    if (p != null && !p.hasFolded && !p.isSittingOut) {
+    if (p != null && !p.hasFolded) {
       out.push(s.seatIndex);
     }
   }
   return out;
+}
+
+/** In the current hand: may take a betting action (not folded, not all-in, has chips to act). */
+export function canActNow(state: CoreGameState, seat: SeatIndex): boolean {
+  return needsToAct(state, seat);
 }
 
 export function needsToAct(state: CoreGameState, seat: SeatIndex): boolean {
@@ -37,7 +54,7 @@ export function needsToAct(state: CoreGameState, seat: SeatIndex): boolean {
   if (hand.showdownReady || hand.street === 'SHOWDOWN') return false;
 
   const p = getPlayerAtSeat(state, seat);
-  if (p == null || p.hasFolded || p.isSittingOut || p.isAllIn) return false;
+  if (p == null || p.hasFolded || p.isAllIn) return false;
 
   if (p.currentBet < hand.currentBet) return true;
 
@@ -82,14 +99,12 @@ export function isBettingRoundComplete(state: CoreGameState): boolean {
   if (hand == null || hand.isComplete) return false;
   if (hand.showdownReady || hand.street === 'SHOWDOWN') return false;
 
-  const contenders = state.table.seats
-    .map((s) => getPlayerAtSeat(state, s.seatIndex))
-    .filter(
-      (p): p is NonNullable<typeof p> =>
-        p != null && !p.hasFolded && !p.isSittingOut,
-    );
+  const contestantSeats = getNonFoldedSeatIndexes(state);
+  if (contestantSeats.length <= 1) return true;
 
-  if (contenders.length <= 1) return true;
+  const contenders = contestantSeats
+    .map((seat) => getPlayerAtSeat(state, seat))
+    .filter((p): p is PlayerRuntimeState => p != null);
 
   if (contenders.every((p) => p.isAllIn)) return true;
 

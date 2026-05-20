@@ -80,6 +80,8 @@ export {
   getOccupiedSeatIndexes,
   getPlayerAtSeat,
   getSmallBlindSeatIndex,
+  isEligibleForNewHand,
+  isSeatEligibleForHand,
 } from './engine/seat-utils';
 
 export { startHand } from './engine/start-hand';
@@ -106,8 +108,11 @@ export {
 
 export {
   advanceTurnAfterAction,
+  canActNow,
   getContestantSeatIndexes,
+  getNonFoldedSeatIndexes,
   isBettingRoundComplete,
+  isContestantInCurrentHand,
   needsToAct,
 } from './engine/betting-round';
 

@@ -205,8 +205,57 @@ export function countEligiblePlayers(state: CoreGameState): number {
   return count;
 }
 
-/** Mark zero-stack (and negative) players sitting out; clear sit-out when they have chips. */
+/**
+ * Drops a completed hand and per-hand bet/cards so the table returns to waiting.
+ * Chip stacks in `playersById` are preserved (used after rebuy).
+ */
+export function clearCompletedHandForWaiting(
+  state: CoreGameState,
+): CoreGameState {
+  const hand = state.hand;
+  if (hand == null || !hand.isComplete) {
+    return state;
+  }
+
+  const playersById = clonePlayers(state.playersById);
+  for (const pid of Object.keys(playersById)) {
+    const p = playersById[pid]!;
+    playersById[pid] = Object.freeze({
+      ...p,
+      holeCards: Object.freeze([]),
+      currentBet: 0,
+      totalCommitted: 0,
+      hasFolded: false,
+      isAllIn: false,
+    });
+  }
+
+  return Object.freeze({
+    ...state,
+    hand: null,
+    table: Object.freeze({
+      ...state.table,
+      activeSeatIndex: null,
+    }),
+    playersById: Object.freeze(playersById),
+  });
+}
+
+/** True while a hand is dealt and not yet finished (no bust/sit-out sync mid-hand). */
+export function hasActiveHandInProgress(state: CoreGameState): boolean {
+  const hand = state.hand;
+  return hand != null && !hand.isComplete;
+}
+
+/**
+ * Mark zero-stack players sitting out for the next hand only.
+ * Skipped during an active hand so all-in contestants (chips === 0) stay in play.
+ */
 export function applySeatEligibility(state: CoreGameState): CoreGameState {
+  if (hasActiveHandInProgress(state)) {
+    return state;
+  }
+
   const playersById = clonePlayers(state.playersById);
 
   for (const pid of Object.keys(playersById)) {

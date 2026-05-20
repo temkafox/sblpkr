@@ -13,6 +13,7 @@ import { useSessionStore } from '../../state/sessionStore';
 vi.mock('../../net/socket', () => ({
   requestGameState: vi.fn(),
   startHand: vi.fn(),
+  rebuy: vi.fn(),
   sendPlayerAction: vi.fn(),
   onGameState: vi.fn(() => () => {}),
   onHandResult: vi.fn(() => () => {}),
@@ -172,12 +173,13 @@ describe('TablePage live room', () => {
   });
 
   it('does not show demo pot while loading in live room', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
     useGameStore.getState().setGameLoading(true);
     renderTable();
     expect(
       screen.queryByText(`$${TABLE_PAGE_MOCK.potAmount}`),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/loading game state/i)).toBeInTheDocument();
+    expect(screen.queryByText(/loading game state/i)).not.toBeInTheDocument();
     expect(document.querySelector('.np-board')).toBeNull();
   });
 
@@ -187,6 +189,25 @@ describe('TablePage live room', () => {
     renderTable();
     expect(screen.queryByText(/loading game state/i)).not.toBeInTheDocument();
     expect(screen.getByText('ljhh')).toBeInTheDocument();
+  });
+
+  it('pre-hand lobby shows both players at $200 without waiting-for-rebuy', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...idlePreHandState,
+      seats: [
+        { ...idlePreHandState.seats[0]!, stack: 200 },
+        ...idlePreHandState.seats.slice(1),
+      ],
+    });
+    const { container } = renderTable();
+    expect(container.textContent).toMatch(/\$200/);
+    expect(
+      screen.getByRole('button', { name: /^start hand$/i }),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.table-page__status')?.textContent ?? '',
+    ).not.toMatch(/not enough players with chips/i);
   });
 
   it('shows Start Hand only with two players and no active hand', () => {
@@ -380,30 +401,217 @@ describe('TablePage live room', () => {
     expect(container.querySelector('.np-action-bar')).toBeNull();
   });
 
-  it('hides Start Next Hand when fewer than two players have chips', () => {
+  it('does not show Rebuy during an active hand even when viewer has $0 all-in', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      viewerSeatIndex: 0,
+      activeSeatIndex: 1,
+      availableActions: {
+        canFold: true,
+        canCheck: false,
+        canCall: true,
+        callAmount: 198,
+        canRaise: false,
+        minRaise: 0,
+        maxRaise: 0,
+        canAllIn: true,
+      },
+      seats: [
+        {
+          ...liveState.seats[0]!,
+          stack: 0,
+          isAllIn: true,
+          isSittingOut: false,
+          currentBet: 200,
+          holeCardCount: 2,
+        },
+        { ...liveState.seats[1]!, stack: 198, holeCardCount: 2 },
+      ],
+    });
+    const { container } = renderTable();
+    expect(screen.queryByRole('button', { name: /rebuy/i })).not.toBeInTheDocument();
+    expect(container.querySelector('.status.t-allin')).not.toBeNull();
+    expect(container.querySelector('.status.t-sitout')).toBeNull();
+  });
+
+  it('ActionBar can call when facing an all-in', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      activeSeatIndex: 1,
+      viewerSeatIndex: 1,
+      availableActions: {
+        canFold: true,
+        canCheck: false,
+        canCall: true,
+        callAmount: 198,
+        canRaise: true,
+        minRaise: 4,
+        maxRaise: 198,
+        canAllIn: true,
+      },
+      seats: [
+        {
+          ...liveState.seats[0]!,
+          stack: 0,
+          isAllIn: true,
+          currentBet: 200,
+          holeCardCount: 2,
+        },
+        { ...liveState.seats[1]!, stack: 198, currentBet: 2, holeCardCount: 2 },
+      ],
+    });
+    renderTable();
+    const callBtn = screen.getByRole('button', { name: /call/i });
+    expect(callBtn).not.toBeDisabled();
+    fireEvent.click(callBtn);
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, { kind: 'call' });
+  });
+
+  it('shows Rebuy button only for busted viewer', () => {
     useRoomStore.getState().setRoomState(duoRoom);
     useGameStore.getState().setGameState({
       ...liveState,
       handComplete: true,
-      street: 'SHOWDOWN',
+      handEndKind: 'FOLD_WIN',
       activeSeatIndex: null,
+      viewerSeatIndex: 1,
       seats: [
         { ...liveState.seats[0]!, stack: 400 },
-        { ...liveState.seats[1]!, stack: 0, isSittingOut: true, holeCards: null, holeCardCount: null },
+        {
+          ...liveState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
       ],
     });
-    useGameStore.getState().setHandResult({
-      handId: 'hand-1',
-      winnerSeatIndexes: [0],
-      awardedAmountsBySeatIndex: { '0': 400 },
-      totalAwarded: 400,
+    renderTable();
+    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+  });
+
+  it('does not show Rebuy for player with chips', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      viewerSeatIndex: 0,
+    });
+    renderTable();
+    expect(screen.queryByRole('button', { name: /rebuy/i })).not.toBeInTheDocument();
+  });
+
+  it('Rebuy emits CLIENT_REBUY via socket', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      viewerSeatIndex: 1,
+      seats: [
+        liveState.seats[0]!,
+        {
+          ...liveState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /rebuy \$200/i }));
+    expect(socket.rebuy).toHaveBeenCalledWith(roomId);
+  });
+
+  it('surfaces rebuy errors when hand is not in progress', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      activeSeatIndex: null,
+      viewerSeatIndex: 1,
+      seats: [
+        liveState.seats[0]!,
+        {
+          ...liveState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+    useGameStore.getState().setGameError('Rebuy is only available when out of chips');
+    const { container } = renderTable();
+    expect(
+      container.querySelector('.table-page__rebuy-error')?.textContent,
+    ).toMatch(/out of chips/i);
+  });
+
+  it('shows Start Hand after rebuy idle state with two eligible players', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...idlePreHandState,
+      viewerSeatIndex: 1,
+      seats: [
+        { ...idlePreHandState.seats[0]!, stack: 400 },
+        {
+          ...idlePreHandState.seats[1]!,
+          stack: 200,
+          isSittingOut: false,
+        },
+      ],
     });
     const { container } = renderTable();
     expect(
-      screen.queryByRole('button', { name: /start next hand/i }),
+      screen.getByRole('button', { name: /^start hand$/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rebuy/i })).not.toBeInTheDocument();
+    expect(
+      container.querySelector('.table-page__status')?.textContent ?? '',
+    ).not.toMatch(/not enough players with chips/i);
+  });
+
+  it('clears sitout styling after server restores viewer stack', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...idlePreHandState,
+      viewerSeatIndex: 0,
+      seats: [
+        {
+          ...idlePreHandState.seats[0]!,
+          stack: 200,
+          isSittingOut: false,
+        },
+        { ...idlePreHandState.seats[1]!, stack: 400 },
+      ],
+    });
+    const { container } = renderTable();
+    expect(container.querySelector('.seat.state-sitout')).toBeNull();
+    expect(container.querySelector('.status.t-sitout')).toBeNull();
+  });
+
+  it('hides Start Hand and shows waiting-for-rebuy when one player is busted', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...idlePreHandState,
+      seats: [
+        { ...idlePreHandState.seats[0]!, stack: 400 },
+        {
+          ...idlePreHandState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+        },
+      ],
+    });
+    const { container } = renderTable();
+    expect(
+      screen.queryByRole('button', { name: /^start hand$/i }),
     ).not.toBeInTheDocument();
     expect(
-      container.querySelector('.table-page__status')?.textContent,
+      container.querySelector('.table-page__status')?.textContent ?? '',
     ).toMatch(/not enough players with chips/i);
   });
 

@@ -4,7 +4,10 @@ import type { CoreGameState } from '../domain/game-state';
 import type { PlayerRuntimeState } from '../domain/player-state';
 import type { SeatIndex } from '../domain/seat';
 
-import { getContestantSeatIndexes } from './betting-round';
+import {
+  getContestantSeatIndexes,
+  getNonFoldedSeatIndexes,
+} from './betting-round';
 import {
   NoEligibleWinnersError,
   PotDistributionError,
@@ -58,7 +61,7 @@ function isResolvedTerminal(hand: NonNullable<CoreGameState['hand']>): boolean {
 }
 
 function isFoldWinContest(state: CoreGameState): boolean {
-  return getContestantSeatIndexes(state).length === 1;
+  return getNonFoldedSeatIndexes(state).length === 1;
 }
 
 function assertCanResolve(state: CoreGameState): void {
@@ -83,12 +86,7 @@ function seatsWithShowdownHoleCards(state: CoreGameState): ReadonlySet<SeatIndex
   const out = new Set<SeatIndex>();
   for (const s of state.table.seats) {
     const p = getPlayerAtSeat(state, s.seatIndex);
-    if (
-      p != null &&
-      !p.hasFolded &&
-      !p.isSittingOut &&
-      p.holeCards.length === 2
-    ) {
+    if (p != null && !p.hasFolded && p.holeCards.length === 2) {
       out.add(s.seatIndex);
     }
   }
@@ -372,7 +370,7 @@ export function distributePots(state: CoreGameState): CoreGameState {
 /** Convenience guard when exactly one contestant remains (fold-down terminal). */
 
 export function resolveFoldWin(state: CoreGameState): CoreGameState {
-  if (getContestantSeatIndexes(state).length !== 1) {
+  if (getNonFoldedSeatIndexes(state).length !== 1) {
     throw new PotDistributionError('resolveFoldWin requires exactly one contestant');
   }
   return resolveShowdown(state);

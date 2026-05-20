@@ -18,6 +18,7 @@ import {
 } from './game.constants';
 import { GameOrchestrationError } from './game.errors';
 import { GameService } from './game.service';
+import { toPlayerGameState } from './game-state-view';
 
 function getTotalWealth(state: CoreGameState): number {
   let sum = 0;
@@ -122,6 +123,24 @@ function closeBettingOnStreet(
 }
 
 describe('GameService (Phase 6C1)', () => {
+  it('syncs a later joiner with DEFAULT_STARTING_CHIPS before first hand', () => {
+    const { roomService, game } = gameHarness('sync-joiner');
+    const room = roomService.createRoom({ maxSeats: 6 });
+    const roomId = room.roomId;
+
+    roomService.registerNickname('sock-0', { nickname: 'First' });
+    roomService.joinRoom('sock-0', { roomId });
+    game.getGameState(roomId);
+
+    roomService.registerNickname('sock-1', { nickname: 'Second' });
+    roomService.joinRoom('sock-1', { roomId });
+
+    const state = game.getGameState(roomId);
+    const secondId = roomService.getRoom(roomId)!.players[1]!.playerId;
+    expect(state.playersById[secondId]!.chips).toBe(DEFAULT_STARTING_CHIPS);
+    expect(state.hand).toBeNull();
+  });
+
   it('cannot start hand with fewer than 2 players', () => {
     const { roomService, game } = gameHarness('6c1-lonely');
     const roomId = seatRoom(roomService, 1);
@@ -403,6 +422,66 @@ describe('GameService (Phase 6C1)', () => {
     expect(idle.playersById[loserId]!.chips).toBe(0);
     expect(idle.playersById[loserId]!.isSittingOut).toBe(true);
     expect(idle.playersById[loserId]!.holeCards.length).toBe(0);
+  });
+
+  it('getGameState keeps all-in zero-stack player in hand so opponent can call', () => {
+    const { roomService, game } = gameHarness('allin-call-path');
+    const roomId = seatRoom(roomService, 2, 6);
+
+    game.startHand(roomId);
+    let state = game.getGameState(roomId);
+    const sbSeat = state.table.smallBlindSeatIndex;
+    const bbSeat = state.table.bigBlindSeatIndex;
+
+    state = act(game, roomId, { kind: 'allin' }, sbSeat);
+    state = game.getGameState(roomId);
+
+    const allInPid = state.table.seats[sbSeat]!.playerId!;
+    expect(state.playersById[allInPid]!.chips).toBe(0);
+    expect(state.playersById[allInPid]!.isAllIn).toBe(true);
+    expect(state.playersById[allInPid]!.isSittingOut).toBe(false);
+    expect(getAvailableActions(state, bbSeat).canCall).toBe(true);
+
+    state = act(game, roomId, { kind: 'call' }, bbSeat);
+    expect(state.hand?.isComplete).toBe(true);
+    expect(state.hand?.street).toBe('SHOWDOWN');
+
+    const room = roomService.getRoom(roomId)!;
+    const view = toPlayerGameState(state, bbSeat, room);
+    expect(view.handEndKind).toBe('SHOWDOWN');
+    expect(view.seats[sbSeat]!.isAllIn).toBe(true);
+    expect(view.seats[sbSeat]!.isSittingOut).toBe(false);
+  });
+
+  it('all-in then fold resolves as FOLD_WIN', () => {
+    const { roomService, game } = gameHarness('allin-fold-win');
+    const roomId = seatRoom(roomService, 2, 6);
+
+    game.startHand(roomId);
+    let state = game.getGameState(roomId);
+    const sbSeat = state.table.smallBlindSeatIndex;
+    const bbSeat = state.table.bigBlindSeatIndex;
+
+    state = act(game, roomId, { kind: 'allin' }, sbSeat);
+    state = act(game, roomId, { kind: 'fold' }, bbSeat);
+
+    expect(state.hand?.isComplete).toBe(true);
+    const room = roomService.getRoom(roomId)!;
+    const view = toPlayerGameState(state, sbSeat, room);
+    expect(view.handEndKind).toBe('FOLD_WIN');
+  });
+
+  it('rebuy rejects during an active hand', () => {
+    const { roomService, game } = gameHarness('rebuy-mid-hand');
+    const roomId = seatRoom(roomService, 2, 6);
+    game.startHand(roomId);
+
+    try {
+      game.rebuy(roomId, 0);
+      expect.fail('expected throw');
+    } catch (err) {
+      expect((err as GameOrchestrationError).code).toBe('HAND_IN_PROGRESS');
+    }
   });
 
   it('reconcileAfterRosterChange folds a third player who left mid-hand', () => {

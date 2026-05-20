@@ -117,6 +117,16 @@ export const RequestGameStatePayloadSchema = z.object({
   roomId: z.string().trim().min(1).max(128),
 });
 
+export const RebuyPayloadSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
+});
+
+export const RebuyConfirmedPayloadSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
+  seatIndex: z.number().int().nonnegative(),
+  chips: ChipAmountSchema,
+});
+
 export type WireSeatView = z.infer<typeof WireSeatViewSchema>;
 export type PublicGameState = z.infer<typeof PublicGameStateSchema>;
 export type PlayerGameState = z.infer<typeof PlayerGameStateSchema>;
@@ -124,3 +134,5 @@ export type HandEndKind = z.infer<typeof handEndKindSchema>;
 export type HandResultPayload = z.infer<typeof HandResultPayloadSchema>;
 export type StartHandPayload = z.infer<typeof StartHandPayloadSchema>;
 export type RequestGameStatePayload = z.infer<typeof RequestGameStatePayloadSchema>;
+export type RebuyPayload = z.infer<typeof RebuyPayloadSchema>;
+export type RebuyConfirmedPayload = z.infer<typeof RebuyConfirmedPayloadSchema>;
