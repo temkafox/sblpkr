@@ -37,10 +37,13 @@ export {
   CannotCheckError,
   CannotRaiseError,
   InsufficientChipsError,
+  NoEligibleWinnersError,
   NotEnoughPlayersError,
   OutOfTurnError,
   PokerCoreError,
+  PotDistributionError,
   SeatNotFoundError,
+  ShowdownNotReadyError,
 } from './engine/errors';
 
 export type { EvaluatedHand } from './engine/hand-evaluator';
@@ -50,6 +53,21 @@ export {
   evaluateBestHand,
   HandCategory,
 } from './engine/hand-evaluator';
+
+export type { AwardedAmountsBySeatIndex } from './engine/pot-distribution';
+export {
+  getOddChipWinner,
+  orderWinnersClockwiseFromDealer,
+  splitPotWithOddChipRule,
+} from './engine/pot-distribution';
+
+export type { PotResult, ShowdownResult } from './engine/showdown';
+export {
+  determineShowdownWinners,
+  distributePots,
+  resolveFoldWin,
+  resolveShowdown,
+} from './engine/showdown';
 
 export {
   getActiveSeatIndexes,

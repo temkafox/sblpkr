@@ -83,3 +83,24 @@ export class DuplicateCardError extends PokerCoreError {
     this.name = 'DuplicateCardError';
   }
 }
+
+export class ShowdownNotReadyError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ShowdownNotReadyError';
+  }
+}
+
+export class NoEligibleWinnersError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoEligibleWinnersError';
+  }
+}
+
+export class PotDistributionError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PotDistributionError';
+  }
+}
