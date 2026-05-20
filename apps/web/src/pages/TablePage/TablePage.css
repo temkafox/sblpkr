@@ -7,3 +7,22 @@
 .table-page > * {
   pointer-events: auto;
 }
+
+.table-page__status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  margin: 0;
+  padding: 6px 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(200, 240, 255, 0.92);
+  background: rgba(8, 16, 28, 0.78);
+  border: 1px solid rgba(34, 211, 255, 0.35);
+  border-radius: var(--r-md);
+  pointer-events: none;
+}

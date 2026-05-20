@@ -68,6 +68,17 @@
   line-height: 1.35;
 }
 
+.jr-panel__error {
+  margin: 0 0 var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #ffb4c8;
+  background: rgba(80, 12, 32, 0.45);
+  border: 1px solid rgba(255, 80, 120, 0.35);
+}
+
 .jr-form {
   display: flex;
   flex-direction: column;

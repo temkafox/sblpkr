@@ -3,16 +3,18 @@ import './JoinRoomPage.css';
 import { type ClipboardEvent, type FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { formatJoinError } from '../../net/errors';
+import { establishRoomSession } from '../../net/roomSession';
+import { createRoom } from '../../net/roomsApi';
 import {
   normalizeNickname,
   validateNickname,
 } from '../../lib/joinValidation';
+import { extractRoomCodeFromPaste } from '../../lib/roomCode';
 import {
-  createLocalRoomCode,
-  extractRoomCodeFromPaste,
-  isValidRoomCode,
-  normalizeRoomCode,
-} from '../../lib/roomCode';
+  isValidRoomLookup,
+  resolveRoomLookupParam,
+} from '../../lib/roomLookup';
 import { useSessionStore } from '../../state/sessionStore';
 
 export function JoinRoomPage() {
@@ -21,15 +23,16 @@ export function JoinRoomPage() {
   const inviteLocked = params.roomId != null && params.roomId !== '';
 
   const lockedRaw = inviteLocked ? params.roomId! : '';
-  const lockedCode = inviteLocked ? normalizeRoomCode(lockedRaw) : '';
+  const lockedLookup = inviteLocked ? resolveRoomLookupParam(lockedRaw) : '';
 
   const savedNickname = useSessionStore((s) => s.nickname);
-  const setSession = useSessionStore((s) => s.setSession);
 
   const [nickname, setNickname] = useState('');
   const [roomInput, setRoomInput] = useState('');
   const [nicknameTouched, setNicknameTouched] = useState(false);
   const [roomTouched, setRoomTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (savedNickname) {
@@ -39,31 +42,33 @@ export function JoinRoomPage() {
 
   useEffect(() => {
     if (inviteLocked) {
-      setRoomInput(lockedCode);
+      setRoomInput(lockedLookup);
       setRoomTouched(false);
     }
-  }, [inviteLocked, lockedCode]);
+  }, [inviteLocked, lockedLookup]);
 
   const nickNorm = normalizeNickname(nickname);
   const nickValidation = validateNickname(nickNorm);
 
-  const effectiveRoomCode = inviteLocked
-    ? lockedCode
-    : extractRoomCodeFromPaste(roomInput);
+  const rawRoomInput = inviteLocked ? lockedRaw : roomInput;
+  const effectiveLookup = inviteLocked
+    ? lockedLookup
+    : resolveRoomLookupParam(extractRoomCodeFromPaste(roomInput));
 
-  const roomValid = isValidRoomCode(effectiveRoomCode);
+  const roomValid = isValidRoomLookup(rawRoomInput);
   const inviteLinkInvalid =
-    inviteLocked && lockedRaw !== '' && !isValidRoomCode(lockedCode);
+    inviteLocked && lockedRaw !== '' && !isValidRoomLookup(lockedRaw);
 
   const nicknameError =
     nicknameTouched && !nickValidation.ok ? nickValidation.message : null;
 
   const roomError =
     roomTouched && !inviteLocked && !roomValid
-      ? 'Room code must be 4–12 letters or numbers.'
+      ? 'Enter a 6-character room code or room id.'
       : null;
 
-  const canSubmit = nickValidation.ok && roomValid && !inviteLinkInvalid;
+  const canSubmit =
+    nickValidation.ok && roomValid && !inviteLinkInvalid && !busy;
 
   const heading = inviteLocked ? 'JOIN ROOM' : 'ENTER ROOM';
 
@@ -86,22 +91,50 @@ export function JoinRoomPage() {
     setRoomTouched(true);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const performJoin = async (lookup: string) => {
+    setPanelError(null);
+    setBusy(true);
+    try {
+      const { roomId } = await establishRoomSession(nickNorm, lookup);
+      navigate(`/table/${encodeURIComponent(roomId)}`);
+    } catch (err) {
+      setPanelError(formatJoinError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setNicknameTouched(true);
     setRoomTouched(true);
 
-    if (!nickValidation.ok || !roomValid || inviteLinkInvalid) return;
+    if (!nickValidation.ok || !roomValid || inviteLinkInvalid || busy) return;
 
-    const roomId = effectiveRoomCode;
-    setSession({ nickname: nickNorm, roomId });
-    navigate(`/table/${encodeURIComponent(roomId)}`);
+    await performJoin(effectiveLookup);
   };
 
-  const handleCreateRoom = () => {
-    const code = createLocalRoomCode();
-    navigate(`/room/${encodeURIComponent(code)}`);
+  const handleCreateRoom = async () => {
+    setNicknameTouched(true);
+    setPanelError(null);
+
+    if (!nickValidation.ok) return;
+
+    setBusy(true);
+    try {
+      const created = await createRoom();
+      const { roomId } = await establishRoomSession(nickNorm, created.roomId);
+      navigate(`/table/${encodeURIComponent(roomId)}`);
+    } catch (err) {
+      setPanelError(formatJoinError(err));
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const displayRoomValue = inviteLocked
+    ? lockedLookup
+    : roomInput;
 
   return (
     <div className="join-room-page">
@@ -112,6 +145,12 @@ export function JoinRoomPage() {
         </header>
 
         <form className="jr-form" onSubmit={handleSubmit} noValidate>
+          {panelError ? (
+            <p className="jr-panel__error" role="alert">
+              {panelError}
+            </p>
+          ) : null}
+
           <label className="jr-field">
             <span className="jr-field__label">Nickname</span>
             <input
@@ -123,6 +162,7 @@ export function JoinRoomPage() {
               onChange={(ev) => setNickname(ev.target.value)}
               onBlur={() => setNicknameTouched(true)}
               spellCheck={false}
+              disabled={busy}
             />
             {nicknameError ? (
               <span className="jr-field__error" role="alert">
@@ -140,13 +180,14 @@ export function JoinRoomPage() {
               maxLength={128}
               readOnly={inviteLocked}
               aria-readonly={inviteLocked}
-              value={inviteLocked ? lockedCode : roomInput}
+              value={displayRoomValue}
               onChange={(ev) =>
                 inviteLocked ? undefined : setRoomInput(ev.target.value)
               }
               onBlur={handleRoomBlur}
               onPaste={inviteLocked ? undefined : handleRoomPaste}
               spellCheck={false}
+              disabled={busy}
             />
             {inviteLinkInvalid ? (
               <span className="jr-field__error" role="alert">
@@ -165,15 +206,16 @@ export function JoinRoomPage() {
               className="jr-btn jr-btn--primary"
               disabled={!canSubmit}
             >
-              Join Room
+              {busy ? 'Joining…' : 'Join Room'}
             </button>
             {!inviteLocked ? (
               <button
                 type="button"
                 className="jr-btn jr-btn--ghost"
-                onClick={handleCreateRoom}
+                onClick={() => void handleCreateRoom()}
+                disabled={busy || !nickValidation.ok}
               >
-                Create Room
+                {busy ? 'Please wait…' : 'Create Room'}
               </button>
             ) : null}
           </div>

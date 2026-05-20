@@ -8,7 +8,11 @@ import { useSessionStore } from './state/sessionStore';
 describe('App smoke', () => {
   beforeEach(() => {
     localStorage.clear();
-    useSessionStore.setState({ nickname: null, roomId: null });
+    useSessionStore.setState({
+      nickname: null,
+      roomId: null,
+      connectionStatus: 'idle',
+    });
   });
 
   it('renders join heading at /join', () => {

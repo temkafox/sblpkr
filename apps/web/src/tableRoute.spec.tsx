@@ -1,14 +1,32 @@
 import { render, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TableRoute } from './routes/TableRoute';
+import * as roomSession from './net/roomSession';
+import {
+  clearTableRouteReconnectKeysForTests,
+  TableRoute,
+} from './routes/TableRoute';
+import { useRoomStore } from './state/roomStore';
 import { useSessionStore } from './state/sessionStore';
+
+vi.mock('./net/roomSession', () => ({
+  establishRoomSession: vi.fn(),
+}));
+
+const roomId = '11111111-1111-4111-8111-111111111111';
 
 describe('TableRoute guard', () => {
   beforeEach(() => {
+    clearTableRouteReconnectKeysForTests();
     localStorage.clear();
-    useSessionStore.setState({ nickname: null, roomId: null });
+    useSessionStore.setState({
+      nickname: null,
+      roomId: null,
+      connectionStatus: 'idle',
+    });
+    useRoomStore.setState({ roomState: null, lastError: null });
+    vi.clearAllMocks();
   });
 
   function renderGuard(initialPath: string) {
@@ -37,14 +55,59 @@ describe('TableRoute guard', () => {
   });
 
   it('renders TablePage when nickname is present', async () => {
-    useSessionStore.setState({ nickname: 'alice', roomId: null });
+    useSessionStore.setState({
+      nickname: 'alice',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    useRoomStore.setState({
+      roomState: {
+        roomId,
+        code: 'ABC123',
+        maxSeats: 9,
+        players: [],
+        status: 'waiting',
+      },
+      lastError: null,
+    });
 
-    const router = renderGuard('/table/ABC1234');
+    const router = renderGuard(`/table/${roomId}`);
 
     await waitFor(() => {
       expect(document.querySelector('.table-page')).not.toBeNull();
     });
 
-    expect(router.state.location.pathname).toBe('/table/ABC1234');
+    expect(router.state.location.pathname).toBe(`/table/${roomId}`);
+    expect(roomSession.establishRoomSession).not.toHaveBeenCalled();
+  });
+
+  it('attempts reconnect once when disconnected', async () => {
+    vi.mocked(roomSession.establishRoomSession).mockResolvedValue({
+      room: {
+        roomId,
+        code: 'ABC123',
+        maxSeats: 9,
+        status: 'waiting',
+        seatedCount: 0,
+        capacityAvailable: true,
+      },
+      roomId,
+    });
+
+    useSessionStore.setState({
+      nickname: 'alice',
+      roomId,
+      connectionStatus: 'idle',
+    });
+
+    renderGuard(`/table/${roomId}`);
+
+    await waitFor(() => {
+      expect(roomSession.establishRoomSession).toHaveBeenCalledTimes(1);
+      expect(roomSession.establishRoomSession).toHaveBeenCalledWith(
+        'alice',
+        roomId,
+      );
+    });
   });
 });
