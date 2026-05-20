@@ -1,13 +1,16 @@
 /** UI-only raise amount helpers — clamp to server-provided min/max, no poker rules. */
 
+import { normalizeChipAmount } from './formatChips';
+
 export function clampRaiseAmount(
   amount: number,
   min: number,
   max: number,
 ): number {
-  if (!Number.isFinite(amount)) return min;
-  if (max < min) return min;
-  return Math.min(max, Math.max(min, amount));
+  const minInt = normalizeChipAmount(min);
+  const maxInt = normalizeChipAmount(max);
+  if (maxInt < minInt) return minInt;
+  return Math.min(maxInt, Math.max(minInt, normalizeChipAmount(amount)));
 }
 
 export function sliderPctFromRaiseAmount(
@@ -15,8 +18,11 @@ export function sliderPctFromRaiseAmount(
   min: number,
   max: number,
 ): number {
-  if (max <= min) return 0;
-  return ((amount - min) / (max - min)) * 100;
+  const minInt = normalizeChipAmount(min);
+  const maxInt = normalizeChipAmount(max);
+  const amountInt = normalizeChipAmount(amount);
+  if (maxInt <= minInt) return 0;
+  return ((amountInt - minInt) / (maxInt - minInt)) * 100;
 }
 
 export function raiseAmountFromSliderPct(
@@ -25,9 +31,11 @@ export function raiseAmountFromSliderPct(
   max: number,
 ): number {
   const clampedPct = Math.min(100, Math.max(0, pct));
-  if (max <= min) return min;
-  const raw = min + ((max - min) * clampedPct) / 100;
-  return clampRaiseAmount(raw, min, max);
+  const minInt = normalizeChipAmount(min);
+  const maxInt = normalizeChipAmount(max);
+  if (maxInt <= minInt) return minInt;
+  const raw = minInt + ((maxInt - minInt) * clampedPct) / 100;
+  return clampRaiseAmount(raw, minInt, maxInt);
 }
 
 export type QuickRaiseKind = 'min' | 'half' | 'pot' | '2x';
@@ -38,22 +46,25 @@ export function quickRaiseAmount(
   max: number,
   potAmount: number,
 ): number {
-  let raw = min;
+  const minInt = normalizeChipAmount(min);
+  const maxInt = normalizeChipAmount(max);
+  const potInt = normalizeChipAmount(potAmount);
+  let raw = minInt;
   switch (kind) {
     case 'min':
-      raw = min;
+      raw = minInt;
       break;
     case 'half':
-      raw = potAmount / 2;
+      raw = Math.round(potInt / 2);
       break;
     case 'pot':
-      raw = potAmount;
+      raw = potInt;
       break;
     case '2x':
-      raw = potAmount * 2;
+      raw = potInt * 2;
       break;
   }
-  return clampRaiseAmount(raw, min, max);
+  return clampRaiseAmount(raw, minInt, maxInt);
 }
 
 export function isValidRaiseAmount(
@@ -61,5 +72,11 @@ export function isValidRaiseAmount(
   min: number,
   max: number,
 ): boolean {
-  return Number.isFinite(amount) && amount >= min && amount <= max;
+  const normalized = normalizeChipAmount(amount);
+  return (
+    normalized === amount &&
+    Number.isFinite(amount) &&
+    amount >= normalizeChipAmount(min) &&
+    amount <= normalizeChipAmount(max)
+  );
 }

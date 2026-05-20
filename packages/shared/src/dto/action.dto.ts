@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
+import { ChipAmountSchema } from './chip-amount';
+
 const fold = z.object({ kind: z.literal('fold') });
 const check = z.object({ kind: z.literal('check') });
 const call = z.object({ kind: z.literal('call') });
 const raise = z.object({
   kind: z.literal('raise'),
-  amount: z.number().finite().nonnegative(),
+  amount: ChipAmountSchema,
 });
 const allin = z.object({ kind: z.literal('allin') });
 

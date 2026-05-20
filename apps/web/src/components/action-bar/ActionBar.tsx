@@ -11,6 +11,7 @@ import {
   sliderPctFromRaiseAmount,
   type QuickRaiseKind,
 } from '../../lib/actionBarRaise';
+import { formatChips } from '../../lib/formatChips';
 
 export interface ActionBarProps {
   availableActions: AvailableActions | undefined;
@@ -122,7 +123,7 @@ export function ActionBar({
             onCall();
           }}
         >
-          CALL <span className="np-ab-sub">${callAmount}</span>
+          CALL <span className="np-ab-sub">${formatChips(callAmount)}</span>
         </button>
         <button
           type="button"
@@ -134,7 +135,7 @@ export function ActionBar({
           }}
         >
           RAISE TO{' '}
-          <span className="np-ab-sub">${raiseAmount.toFixed(2)}</span>
+          <span className="np-ab-sub">${formatChips(raiseAmount)}</span>
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import './Seats.css';
 
 import { Avatar } from './Avatar';
+import { formatChips } from '../../lib/formatChips';
 import type { SeatPosition } from '../../lib/layout';
 import type { PlayerMock, SeatStateMock } from '../../mocks/tableMock';
 
@@ -49,9 +50,9 @@ function heroStatusText(st: SeatStateMock): string {
     case 'check':
       return 'CHECK';
     case 'call':
-      return st.bet ? `CALL $${st.bet}` : 'CALL';
+      return st.bet ? `CALL $${formatChips(st.bet)}` : 'CALL';
     case 'raise':
-      return `RAISE TO $${st.bet || 0}`;
+      return `RAISE TO $${formatChips(st.bet || 0)}`;
     case 'allin':
       return 'ALL-IN';
     case 'winner':
@@ -79,7 +80,7 @@ export function HeroSeat({ player, state: st, position: pos }: HeroSeatProps) {
       <div className="body">
         <div className="body-inner">
           <div className="name">{player.name}</div>
-          <div className="stack">${player.stack.toFixed(2)}</div>
+          <div className="stack">${formatChips(player.stack)}</div>
           <div className={`status ${heroStatusClass(st.status)}`}>{heroStatusText(st)}</div>
         </div>
         <div className="timer">

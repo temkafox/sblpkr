@@ -157,7 +157,7 @@ describe('TablePage live room', () => {
       screen.getByText(/waiting for another player/i),
     ).toBeInTheDocument();
     expect(container.querySelector('.np-action-bar')).toBeNull();
-    expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$0.00');
+    expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$0');
   });
 
   it('idle gameState without handId does not render demo mock names', () => {
@@ -174,7 +174,7 @@ describe('TablePage live room', () => {
     useGameStore.getState().setGameLoading(true);
     renderTable();
     expect(
-      screen.queryByText(`$${TABLE_PAGE_MOCK.potAmount.toFixed(2)}`),
+      screen.queryByText(`$${TABLE_PAGE_MOCK.potAmount}`),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/loading game state/i)).toBeInTheDocument();
     expect(document.querySelector('.np-board')).toBeNull();
@@ -198,7 +198,7 @@ describe('TablePage live room', () => {
     useGameStore.getState().setGameState(liveState);
     useRoomStore.getState().setRoomState(duoRoom);
     const { container } = renderTable();
-    expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$3.00');
+    expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$3');
     expect(container.querySelector('.np-board')).not.toBeNull();
     expect(container.querySelector('.np-action-bar')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /start hand/i })).not.toBeInTheDocument();
@@ -337,5 +337,20 @@ describe('TablePage live room', () => {
     useGameStore.getState().setGameError('Not your turn');
     renderTable();
     expect(screen.getByText('Not your turn')).toBeInTheDocument();
+  });
+
+  it('renders integer chip amounts without decimals during a hand', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      pot: { total: 76, sidePots: [] },
+      seats: [
+        { ...liveState.seats[0]!, stack: 238 },
+        { ...liveState.seats[1]!, stack: 162 },
+      ],
+    });
+    const { container } = renderTable();
+    expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$76');
+    expect(container.textContent).not.toMatch(/\$\d+\.\d+/);
   });
 });

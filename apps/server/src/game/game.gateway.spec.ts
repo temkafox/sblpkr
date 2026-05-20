@@ -237,6 +237,12 @@ describe('Game gateway (Phase 6C2)', () => {
     expect(() =>
       PlayerActionPayloadSchema.parse({ action: { kind: 'fold' } }),
     ).toThrow();
+    expect(() =>
+      PlayerActionPayloadSchema.parse({
+        roomId: 'room-1',
+        action: { kind: 'raise', amount: 25.5 },
+      }),
+    ).toThrow();
     expect(() => StartHandPayloadSchema.parse({ roomId: '' })).toThrow();
   });
 

@@ -328,6 +328,20 @@ describe('socket client', () => {
     expect(useGameStore.getState().isSubmittingAction).toBe(true);
   });
 
+  it('sendPlayerAction rounds fractional raise amount before emit', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    sendPlayerAction(roomState.roomId, { kind: 'raise', amount: 25.7 });
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_PLAYER_ACTION, {
+      roomId: roomState.roomId,
+      action: { kind: 'raise', amount: 26 },
+    });
+  });
+
   it('SERVER_ERROR clears submitting state and surfaces gameError', async () => {
     useGameStore.getState().setSubmittingAction(true);
 

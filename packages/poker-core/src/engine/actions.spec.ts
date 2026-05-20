@@ -193,6 +193,27 @@ describe('applyAction', () => {
     ).toThrow(InsufficientChipsError);
   });
 
+  it('rejects fractional raise amount', () => {
+    const g = sixMaxThreeWay();
+    const utgSeat = g.table.activeSeatIndex!;
+    expect(() =>
+      applyAction(g, utgSeat, { kind: 'raise', amount: 25.5 }),
+    ).toThrow(InvalidActionError);
+  });
+
+  it('keeps integer stacks and pot after raise', () => {
+    const g = sixMaxThreeWay();
+    const utgSeat = g.table.activeSeatIndex!;
+    const target = g.hand!.currentBet + g.hand!.minRaise;
+    const next = applyAction(g, utgSeat, { kind: 'raise', amount: target });
+
+    expect(Number.isInteger(next.hand!.pots.total)).toBe(true);
+    for (const p of Object.values(next.playersById)) {
+      expect(Number.isInteger(p.chips)).toBe(true);
+      expect(Number.isInteger(p.currentBet)).toBe(true);
+    }
+  });
+
   it('all-in commits entire stack', () => {
     const g = huStarted();
     const sbSeat = g.table.activeSeatIndex!;

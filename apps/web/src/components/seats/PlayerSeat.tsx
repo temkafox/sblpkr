@@ -2,6 +2,7 @@ import './Seats.css';
 
 import { Avatar } from './Avatar';
 import { OppHoles } from './OppHoles';
+import { formatChips } from '../../lib/formatChips';
 import type { SeatPosition } from '../../lib/layout';
 import type { PlayerMock, SeatStateMock } from '../../mocks/tableMock';
 
@@ -54,9 +55,9 @@ function opponentStatusText(st: SeatStateMock): string {
     case 'check':
       return 'CHECK';
     case 'call':
-      return st.bet ? `CALL $${st.bet}` : 'CALL';
+      return st.bet ? `CALL $${formatChips(st.bet)}` : 'CALL';
     case 'raise':
-      return `RAISE TO $${st.bet || 0}`;
+      return `RAISE TO $${formatChips(st.bet || 0)}`;
     case 'allin':
       return 'ALL-IN';
     case 'winner':
@@ -88,7 +89,7 @@ export function PlayerSeat({ player, state: st, position: pos, showHoles }: Play
       <div className="body">
         <div className="body-inner">
           <div className="name">{player.name}</div>
-          <div className="stack">${player.stack.toFixed(2)}</div>
+          <div className="stack">${formatChips(player.stack)}</div>
           <div className={`status ${opponentStatusClass(st.status)}`}>{opponentStatusText(st)}</div>
         </div>
         <div className="timer">

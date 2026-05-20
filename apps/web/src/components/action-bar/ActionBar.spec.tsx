@@ -109,16 +109,38 @@ describe('ActionBar', () => {
   it('quick buttons update raise amount', () => {
     render(<ActionBar {...baseProps} potAmount={100} />);
     fireEvent.click(screen.getByRole('button', { name: /1\/2 pot/i }));
-    expect(screen.getByRole('button', { name: /^raise to \$50\.00/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^raise to \$50/i })).toBeInTheDocument();
   });
 
-  it('raise amount clamps to min/max via slider', () => {
+  it('raise amount clamps to integer via slider', () => {
+    render(<ActionBar {...baseProps} />);
+    const slider = screen.getByRole('slider', { name: /raise amount slider/i });
+    fireEvent.change(slider, { target: { value: '33' } });
+    const raiseBtn = screen.getByRole('button', { name: /^raise to \$/i });
+    expect(raiseBtn.textContent).toMatch(/\$\d+$/);
+    expect(raiseBtn.textContent).not.toMatch(/\.\d/);
+  });
+
+  it('amount input normalizes fractional input on change', () => {
+    render(<ActionBar {...baseProps} />);
+    const input = screen.getByRole('spinbutton', { name: /raise amount/i });
+    fireEvent.change(input, { target: { value: '25.7' } });
+    expect(screen.getByRole('button', { name: /^raise to \$26/i })).toBeInTheDocument();
+  });
+
+  it('quick buttons produce integer amounts', () => {
+    render(<ActionBar {...baseProps} potAmount={101} />);
+    fireEvent.click(screen.getByRole('button', { name: /1\/2 pot/i }));
+    expect(screen.getByRole('button', { name: /^raise to \$51/i })).toBeInTheDocument();
+  });
+
+  it('slider at max produces integer maxRaise', () => {
     render(<ActionBar {...baseProps} />);
     const slider = screen.getByRole('slider', { name: /raise amount slider/i });
     fireEvent.change(slider, { target: { value: '100' } });
-    expect(screen.getByRole('button', { name: /^raise to \$100\.00/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^raise to \$100/i })).toBeInTheDocument();
     fireEvent.change(slider, { target: { value: '0' } });
-    expect(screen.getByRole('button', { name: /^raise to \$10\.00/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^raise to \$10/i })).toBeInTheDocument();
   });
 
   it('disables controls while submitting', () => {

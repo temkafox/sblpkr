@@ -233,7 +233,11 @@ export function sendPlayerAction(
   action: PlayerActionIntent,
 ): void {
   useGameStore.getState().setSubmittingAction(true);
-  socket?.emit(CLIENT_PLAYER_ACTION, { roomId, action });
+  const normalized: PlayerActionIntent =
+    action.kind === 'raise'
+      ? { kind: 'raise', amount: Math.max(0, Math.round(action.amount)) }
+      : action;
+  socket?.emit(CLIENT_PLAYER_ACTION, { roomId, action: normalized });
 }
 
 export function onGameState(

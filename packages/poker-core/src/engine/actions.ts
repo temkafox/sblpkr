@@ -18,6 +18,7 @@ import {
   InvalidTableStateError,
   OutOfTurnError,
 } from './errors';
+import { requireIntegerChipAmount } from './chip-amount';
 import { applyAggressiveBetMetadata, getMinimumRaiseTarget } from './min-raise';
 import { getPlayerAtSeat } from './seat-utils';
 
@@ -114,7 +115,7 @@ export function applyAction(
       break;
     }
     case 'raise': {
-      const target = action.amount;
+      const target = requireIntegerChipAmount(action.amount, 'Raise amount');
       const maxTotal = p.currentBet + p.chips;
       const minLegal = getMinimumRaiseTarget(state);
 

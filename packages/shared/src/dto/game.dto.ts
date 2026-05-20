@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ChipAmountSchema } from './chip-amount';
+
 const cardSchema = z.object({
   r: z.enum([
     '2',
@@ -28,12 +30,12 @@ const streetSchema = z.enum([
 ]);
 
 const sidePotSchema = z.object({
-  amount: z.number().nonnegative(),
+  amount: ChipAmountSchema,
   eligibleSeatIndexes: z.array(z.number().int().nonnegative()),
 });
 
 const potViewSchema = z.object({
-  total: z.number().nonnegative(),
+  total: ChipAmountSchema,
   sidePots: z.array(sidePotSchema),
 });
 
@@ -41,10 +43,10 @@ const availableActionsSchema = z.object({
   canFold: z.boolean(),
   canCheck: z.boolean(),
   canCall: z.boolean(),
-  callAmount: z.number().nonnegative(),
+  callAmount: ChipAmountSchema,
   canRaise: z.boolean(),
-  minRaise: z.number().nonnegative(),
-  maxRaise: z.number().nonnegative(),
+  minRaise: ChipAmountSchema,
+  maxRaise: ChipAmountSchema,
   canAllIn: z.boolean(),
 });
 
@@ -52,8 +54,8 @@ export const WireSeatViewSchema = z.object({
   seatIndex: z.number().int().nonnegative(),
   playerId: z.string().nullable(),
   nickname: z.string().nullable(),
-  stack: z.number().nonnegative(),
-  currentBet: z.number().nonnegative(),
+  stack: ChipAmountSchema,
+  currentBet: ChipAmountSchema,
   hasFolded: z.boolean(),
   isAllIn: z.boolean(),
   isSittingOut: z.boolean(),

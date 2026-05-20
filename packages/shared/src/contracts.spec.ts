@@ -63,12 +63,21 @@ describe('PlayerActionPayloadSchema', () => {
     expect(out.action.kind).toBe('fold');
   });
 
-  it('parses raise with amount', () => {
+  it('parses raise with integer amount', () => {
     const out = PlayerActionPayloadSchema.parse({
       roomId: 'room-1',
       action: { kind: 'raise', amount: 50 },
     });
     expect(out.action).toEqual({ kind: 'raise', amount: 50 });
+  });
+
+  it('rejects fractional raise amount', () => {
+    expect(() =>
+      PlayerActionPayloadSchema.parse({
+        roomId: 'room-1',
+        action: { kind: 'raise', amount: 50.5 },
+      }),
+    ).toThrow();
   });
 
   it('rejects unknown kind', () => {
