@@ -27,3 +27,25 @@ export type { CoreGameState, InitialGameConfig } from './domain/game-state';
 export { createInitialGameState } from './domain/game-state';
 
 export type { CorePlayerAction } from './domain/player-action';
+
+export {
+  InvalidTableStateError,
+  NotEnoughPlayersError,
+  PokerCoreError,
+  SeatNotFoundError,
+} from './engine/errors';
+
+export {
+  getActiveSeatIndexes,
+  getActiveSeatOrderClockwiseFrom,
+  getBigBlindSeatIndex,
+  getFirstToActPreflop,
+  getNextActiveSeatIndex,
+  getNextOccupiedSeatIndex,
+  getOccupiedSeatIndexes,
+  getPlayerAtSeat,
+  getSmallBlindSeatIndex,
+} from './engine/seat-utils';
+
+export { startHand } from './engine/start-hand';
+export type { StartHandOptions } from './engine/start-hand';
