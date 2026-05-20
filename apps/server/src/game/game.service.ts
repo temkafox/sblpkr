@@ -15,6 +15,10 @@ import { toCorePlayerAction } from './action-mapper';
 import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
 import { buildHandResultPayload } from './hand-result';
+import {
+  foldDepartedPlayers,
+  syncTableToRoom,
+} from '../table/table-roster-sync';
 
 export type GameRngFactory = (roomId: string) => RandomSource;
 
@@ -60,7 +64,18 @@ export class GameService {
       );
     }
 
-    const base = this.tableService.createTableForRoom(room);
+    const existing = this.tableService.getTableState(roomId);
+    const base =
+      existing != null
+        ? syncTableToRoom(room, existing)
+        : this.tableService.createTableForRoom(room);
+
+    if (base.hand != null && !base.hand.isComplete) {
+      throw new GameOrchestrationError(
+        'HAND_ALREADY_ACTIVE',
+        'Cannot start a new hand while one is active',
+      );
+    }
 
     let started: CoreGameState;
     try {
@@ -140,6 +155,43 @@ export class GameService {
     }
     this.tableService.deleteTable(roomId);
     return true;
+  }
+
+  /**
+   * After leave/disconnect with two or more players still seated: fold departed
+   * seats, sync roster, auto-progress if the hand can resolve, and broadcast.
+   */
+  reconcileAfterRosterChange(roomId: string): CoreGameState | null {
+    const room = this.requireRoom(roomId);
+    if (room.players.length < 2) {
+      return null;
+    }
+
+    let state = this.tableService.getTableState(roomId);
+    if (state == null) {
+      return null;
+    }
+
+    state = foldDepartedPlayers(state, room);
+    state = syncTableToRoom(room, state);
+
+    const progressed = progressGameState(state);
+    state = progressed.state;
+    if (progressed.showdownResult != null && state.hand?.handId != null) {
+      this.tableService.setHandResult(
+        roomId,
+        buildHandResultPayload(
+          state.hand.handId,
+          progressed.showdownResult,
+          progressed.isFoldWin,
+        ),
+      );
+    } else if (state.hand == null || !state.hand.isComplete) {
+      this.tableService.clearHandResult(roomId);
+    }
+
+    this.tableService.setTableState(roomId, state);
+    return state;
   }
 
   private requireRoom(roomId: string) {

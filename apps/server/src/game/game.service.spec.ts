@@ -334,4 +334,53 @@ describe('GameService (Phase 6C1)', () => {
       expect((err as GameOrchestrationError).code).toBe('NO_ACTIVE_HAND');
     }
   });
+
+  it('startHand preserves chip stacks after a completed fold-win hand', () => {
+    const { roomService, game } = gameHarness('7e-next-hand-chips');
+    const roomId = seatRoom(roomService, 2, 6);
+
+    let state = game.startHand(roomId);
+    const wealthAfterFirstDeal = getTotalWealth(state);
+
+    state = act(game, roomId, { kind: 'fold' });
+    expect(state.hand?.isComplete).toBe(true);
+    expect(getTotalWealth(state)).toBe(wealthAfterFirstDeal);
+
+    const next = game.startHand(roomId);
+    expect(getTotalWealth(next)).toBe(wealthAfterFirstDeal);
+
+    const winner = Object.values(state.playersById).find((p) => !p.hasFolded)!;
+    const winnerAfter = next.playersById[winner.playerId]!;
+    expect(winnerAfter.chips).toBeLessThanOrEqual(winner.chips);
+    expect(winnerAfter.chips + winnerAfter.totalCommitted).toBeLessThanOrEqual(
+      winner.chips + winner.totalCommitted,
+    );
+  });
+
+  it('reconcileAfterRosterChange folds a third player who left mid-hand', () => {
+    const { roomService, game } = gameHarness('7e-leave-three');
+    const roomId = seatRoom(roomService, 3, 6);
+
+    game.startHand(roomId);
+    const room = roomService.getRoom(roomId)!;
+    const departedId = room.players[2]!.playerId;
+    const leaverSocket = room.players[2]!.socketId;
+    roomService.handleDisconnect(leaverSocket);
+
+    expect(roomService.getRoom(roomId)!.players).toHaveLength(2);
+
+    const state = game.reconcileAfterRosterChange(roomId);
+    expect(state).not.toBeNull();
+    expect(
+      state!.table.seats.some((s) => s.playerId === departedId),
+    ).toBe(false);
+    for (const seat of state!.table.seats) {
+      if (seat.playerId == null) continue;
+      expect(
+        roomService
+          .getRoom(roomId)!
+          .players.some((p) => p.playerId === seat.playerId),
+      ).toBe(true);
+    }
+  });
 });

@@ -288,6 +288,23 @@ describe('socket client', () => {
     expect(useGameStore.getState().handResult).toEqual(handResult);
   });
 
+  it('SERVER_HAND_RESULT ignores payloads for a different handId', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    useGameStore.getState().setGameState({
+      ...gameState,
+      handId: 'hand-current',
+      handComplete: true,
+    });
+
+    fire(SERVER_HAND_RESULT, { ...handResult, handId: 'hand-stale' });
+
+    expect(useGameStore.getState().handResult).toBeNull();
+  });
+
   it('requestGameState emits CLIENT_REQUEST_GAME_STATE', async () => {
     const connectPromise = connectSocket();
     mockSocket.connected = true;

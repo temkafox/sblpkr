@@ -225,6 +225,12 @@ export class RoomGateway implements OnGatewayDisconnect {
     this.broadcastRoomState(roomId);
     if (this.gameService.abortHandIfInsufficientPlayers(roomId)) {
       this.gameBroadcast.emitWaitingGameStateToRoom(this.server, roomId);
+      return;
+    }
+
+    const state = this.gameService.reconcileAfterRosterChange(roomId);
+    if (state != null) {
+      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
     }
   }
 

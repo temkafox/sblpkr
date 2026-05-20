@@ -90,6 +90,14 @@ function attachGlobalListeners(client: Socket): void {
   });
 
   client.on(SERVER_HAND_RESULT, (payload: HandResultPayload) => {
+    const current = useGameStore.getState().gameState;
+    if (
+      current?.handId != null &&
+      current.handId.length > 0 &&
+      payload.handId !== current.handId
+    ) {
+      return;
+    }
     useGameStore.getState().setHandResult(payload);
     useGameStore.getState().setSubmittingAction(false);
     for (const listener of handResultListeners) {

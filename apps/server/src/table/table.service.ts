@@ -9,6 +9,7 @@ import {
   DEFAULT_STARTING_CHIPS,
 } from '../game/game.constants';
 import type { MutableInternalRoom } from '../room/room.types';
+import { syncTableToRoom } from './table-roster-sync';
 
 @Injectable()
 export class TableService {
@@ -71,5 +72,16 @@ export class TableService {
       return existing;
     }
     return this.createTableForRoom(room);
+  }
+
+  /** Align seats with room roster while preserving chip stacks between hands. */
+  reconcileTableWithRoom(room: MutableInternalRoom): CoreGameState | null {
+    const existing = this.getTableState(room.roomId);
+    if (existing == null) {
+      return null;
+    }
+    const synced = syncTableToRoom(room, existing);
+    this.tables.set(room.roomId, synced);
+    return synced;
   }
 }
