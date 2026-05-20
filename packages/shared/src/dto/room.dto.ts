@@ -1,6 +1,60 @@
 import { z } from 'zod';
 
 import { PROTOCOL_VERSION } from '../protocol';
+import type { RoomStatus } from '../types/room';
+
+/** Allowed table sizes for MVP room creation (REST Phase 6A). */
+
+export const ALLOWED_ROOM_MAX_SEATS = [2, 4, 6, 9] as const;
+
+export const MaxSeatsSchema = z.union([
+  z.literal(2),
+  z.literal(4),
+  z.literal(6),
+  z.literal(9),
+]);
+
+export type AllowedRoomMaxSeats = z.infer<typeof MaxSeatsSchema>;
+
+/** Shareable invite code — 6 uppercase alphanumeric (no ambiguous chars enforced server-side). */
+
+export const ROOM_CODE_PATTERN = /^[A-Z0-9]{6}$/;
+
+export const RoomCodeSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(ROOM_CODE_PATTERN, 'Room code must be 6 uppercase alphanumeric characters');
+
+export const RoomIdSchema = z.string().uuid();
+
+/** Path param for `GET /rooms/:roomIdOrCode`. */
+
+export const RoomIdOrCodeParamSchema = z.union([RoomIdSchema, RoomCodeSchema]);
+
+export const CreateRoomRequestSchema = z.object({
+  maxSeats: MaxSeatsSchema.optional(),
+});
+
+export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
+
+export type CreateRoomResponse = {
+  readonly roomId: string;
+  readonly code: string;
+  readonly maxSeats: number;
+  readonly status: RoomStatus;
+  readonly seatedCount: number;
+  readonly createdAt: string;
+};
+
+export type GetRoomResponse = {
+  readonly roomId: string;
+  readonly code: string;
+  readonly maxSeats: number;
+  readonly status: RoomStatus;
+  readonly seatedCount: number;
+  readonly capacityAvailable: boolean;
+};
 
 /** Matches Phase 1D nickname rules — duplicate enforcement stays server-side. */
 

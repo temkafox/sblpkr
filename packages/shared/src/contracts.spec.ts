@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ChatMessagePayloadSchema,
   ClientHelloSchema,
+  CreateRoomRequestSchema,
   JoinRoomPayloadSchema,
   PlayerActionPayloadSchema,
   PROTOCOL_VERSION,
   RegisterNicknamePayloadSchema,
+  RoomCodeSchema,
+  RoomIdOrCodeParamSchema,
   ServerErrorPayloadSchema,
   SOCKET_EVENTS,
 } from './index';
@@ -121,5 +124,26 @@ describe('ServerErrorPayloadSchema', () => {
     expect(() =>
       ServerErrorPayloadSchema.parse({ code: 'NOT_A_REAL_CODE' }),
     ).toThrow();
+  });
+});
+
+describe('REST room schemas (Phase 6A)', () => {
+  it('CreateRoomRequestSchema accepts allowed maxSeats', () => {
+    expect(CreateRoomRequestSchema.parse({})).toEqual({});
+    expect(CreateRoomRequestSchema.parse({ maxSeats: 9 })).toEqual({
+      maxSeats: 9,
+    });
+    expect(() => CreateRoomRequestSchema.parse({ maxSeats: 5 })).toThrow();
+  });
+
+  it('RoomCodeSchema normalizes to uppercase', () => {
+    expect(RoomCodeSchema.parse('abc123')).toBe('ABC123');
+  });
+
+  it('RoomIdOrCodeParamSchema accepts uuid or code', () => {
+    expect(
+      RoomIdOrCodeParamSchema.parse('11111111-1111-4111-8111-111111111111'),
+    ).toBe('11111111-1111-4111-8111-111111111111');
+    expect(RoomIdOrCodeParamSchema.parse('ROOM01')).toBe('ROOM01');
   });
 });
