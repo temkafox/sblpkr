@@ -69,6 +69,8 @@ export interface SeatStateMock {
   status: SeatStatus;
   bet: number;
   amount?: number | '';
+  /** When false, opponent backcards are hidden (server has no holeCardCount). */
+  showOppBackcards?: boolean;
 }
 
 export type PlayerRing = 'cyan' | 'pink' | 'magenta' | 'violet' | 'green' | 'amber';

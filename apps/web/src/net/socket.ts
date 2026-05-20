@@ -2,12 +2,22 @@ import {
   CLIENT_JOIN_ROOM,
   CLIENT_LEAVE_ROOM,
   CLIENT_REGISTER_NICKNAME,
+  CLIENT_REQUEST_GAME_STATE,
+  CLIENT_START_HAND,
   SERVER_ERROR,
+  SERVER_GAME_STATE,
+  SERVER_HAND_RESULT,
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
-import type { RoomStatePayload, ServerErrorPayload } from '@neonpoker/shared';
+import type {
+  HandResultPayload,
+  PlayerGameState,
+  RoomStatePayload,
+  ServerErrorPayload,
+} from '@neonpoker/shared';
 import { io, type Socket } from 'socket.io-client';
 
+import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import {
   type ConnectionStatus,
@@ -19,6 +29,9 @@ const JOIN_TIMEOUT_MS = 8_000;
 
 let socket: Socket | null = null;
 let listenersAttached = false;
+
+const gameStateListeners = new Set<(state: PlayerGameState) => void>();
+const handResultListeners = new Set<(result: HandResultPayload) => void>();
 
 export class SocketRoomError extends Error {
   readonly code: string;
@@ -46,8 +59,23 @@ function attachGlobalListeners(client: Socket): void {
     setConnectionStatus('connected');
   });
 
+  client.on(SERVER_GAME_STATE, (payload: PlayerGameState) => {
+    useGameStore.getState().setGameState(payload);
+    for (const listener of gameStateListeners) {
+      listener(payload);
+    }
+  });
+
+  client.on(SERVER_HAND_RESULT, (payload: HandResultPayload) => {
+    useGameStore.getState().setHandResult(payload);
+    for (const listener of handResultListeners) {
+      listener(payload);
+    }
+  });
+
   client.on(SERVER_ERROR, (payload: ServerErrorPayload) => {
     useRoomStore.getState().setError(payload);
+    useGameStore.getState().setGameError(payload.message ?? payload.code);
     setConnectionStatus('error');
   });
 
@@ -106,6 +134,8 @@ export function disconnectSocket(): void {
   socket?.removeAllListeners();
   socket = null;
   listenersAttached = false;
+  gameStateListeners.clear();
+  handResultListeners.clear();
   setConnectionStatus('idle');
 }
 
@@ -161,7 +191,35 @@ export function joinRoom(roomId: string): Promise<RoomStatePayload> {
   });
 }
 
+export function requestGameState(roomId: string): void {
+  useGameStore.getState().setGameLoading(true);
+  socket?.emit(CLIENT_REQUEST_GAME_STATE, { roomId });
+}
+
+export function startHand(roomId: string): void {
+  socket?.emit(CLIENT_START_HAND, { roomId });
+}
+
+export function onGameState(
+  callback: (state: PlayerGameState) => void,
+): () => void {
+  gameStateListeners.add(callback);
+  return () => {
+    gameStateListeners.delete(callback);
+  };
+}
+
+export function onHandResult(
+  callback: (result: HandResultPayload) => void,
+): () => void {
+  handResultListeners.add(callback);
+  return () => {
+    handResultListeners.delete(callback);
+  };
+}
+
 /** Test-only reset of the singleton socket client. */
 export function resetSocketClientForTests(): void {
   disconnectSocket();
+  useGameStore.getState().clearGameState();
 }

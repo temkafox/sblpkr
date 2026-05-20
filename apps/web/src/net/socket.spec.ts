@@ -1,13 +1,28 @@
-import { SERVER_ERROR, SERVER_ROOM_STATE } from '@neonpoker/shared';
-import type { RoomStatePayload, ServerErrorPayload } from '@neonpoker/shared';
+import {
+  CLIENT_REQUEST_GAME_STATE,
+  CLIENT_START_HAND,
+  SERVER_ERROR,
+  SERVER_GAME_STATE,
+  SERVER_HAND_RESULT,
+  SERVER_ROOM_STATE,
+} from '@neonpoker/shared';
+import type {
+  HandResultPayload,
+  PlayerGameState,
+  RoomStatePayload,
+  ServerErrorPayload,
+} from '@neonpoker/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import { useSessionStore } from '../state/sessionStore';
 import {
   connectSocket,
   joinRoom,
+  requestGameState,
   resetSocketClientForTests,
+  startHand,
 } from './socket';
 
 const roomState: RoomStatePayload = {
@@ -16,6 +31,27 @@ const roomState: RoomStatePayload = {
   maxSeats: 9,
   players: [],
   status: 'waiting',
+};
+
+const gameState: PlayerGameState = {
+  tableId: roomState.roomId,
+  maxSeats: 2,
+  street: null,
+  boardCards: [],
+  pot: { total: 0, sidePots: [] },
+  dealerSeatIndex: null,
+  smallBlindSeatIndex: null,
+  bigBlindSeatIndex: null,
+  activeSeatIndex: null,
+  seats: [],
+  handId: null,
+  handComplete: false,
+  showdownReady: false,
+};
+
+const handResult: HandResultPayload = {
+  handId: 'hand-1',
+  winnerSeatIndexes: [0],
 };
 
 type Handler = (...args: unknown[]) => void;
@@ -68,6 +104,7 @@ describe('socket client', () => {
     mockSocket.once.mockClear();
     resetSocketClientForTests();
     useRoomStore.setState({ roomState: null, lastError: null });
+    useGameStore.getState().clearGameState();
     useSessionStore.setState({
       nickname: null,
       roomId: null,
@@ -105,6 +142,55 @@ describe('socket client', () => {
 
     expect(useRoomStore.getState().lastError).toEqual(err);
     expect(useSessionStore.getState().connectionStatus).toBe('error');
+  });
+
+  it('SERVER_GAME_STATE updates gameStore', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_GAME_STATE, gameState);
+
+    expect(useGameStore.getState().gameState).toEqual(gameState);
+  });
+
+  it('SERVER_HAND_RESULT updates gameStore', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_HAND_RESULT, handResult);
+
+    expect(useGameStore.getState().handResult).toEqual(handResult);
+  });
+
+  it('requestGameState emits CLIENT_REQUEST_GAME_STATE', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    requestGameState(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_REQUEST_GAME_STATE, {
+      roomId: roomState.roomId,
+    });
+    expect(useGameStore.getState().isGameLoading).toBe(true);
+  });
+
+  it('startHand emits CLIENT_START_HAND', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    startHand(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_START_HAND, {
+      roomId: roomState.roomId,
+    });
   });
 
   it('joinRoom resolves on SERVER_ROOM_STATE', async () => {
