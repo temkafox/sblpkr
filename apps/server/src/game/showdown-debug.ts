@@ -8,6 +8,8 @@ import {
 
 import type { MutableInternalRoom } from '../room/room.types';
 
+import { isShowdownDebugEnabled } from './showdown-debug-config';
+
 const logger = new Logger('Showdown');
 
 function formatCard(card: { readonly r: string; readonly s: string }): string {
@@ -28,6 +30,10 @@ export function logShowdownResolution(
   result: ShowdownResult,
   room: MutableInternalRoom | null,
 ): void {
+  if (!isShowdownDebugEnabled()) {
+    return;
+  }
+
   const hand = state.hand;
   if (hand == null) {
     return;
