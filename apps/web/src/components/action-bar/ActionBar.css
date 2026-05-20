@@ -58,7 +58,7 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   border-radius: 14px;
-  cursor: default;
+  cursor: pointer;
   user-select: none;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(12, 7, 26, 0.75);
@@ -208,6 +208,23 @@
   font-weight: 700;
   color: #fff;
   text-align: center;
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  -moz-appearance: textfield;
+}
+
+.np-action-bar .np-ab-amt-input .np-ab-amt-val::-webkit-outer-spin-button,
+.np-action-bar .np-ab-amt-input .np-ab-amt-val::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.np-action-bar .np-ab-amt-input .np-ab-amt-val:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .np-action-bar .np-ab-amt-input .np-ab-pre {
@@ -230,7 +247,7 @@
   background: rgba(12, 6, 24, 0.85);
   border: 1px solid rgba(139, 92, 255, 0.4);
   color: var(--text-hi);
-  cursor: default;
+  cursor: pointer;
   font-size: 20px;
   font-weight: 700;
   transition:
@@ -250,6 +267,21 @@
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   overflow: visible;
+}
+
+.np-action-bar .np-ab-slider-input {
+  position: absolute;
+  inset: -8px 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.np-action-bar .np-ab-slider-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .np-action-bar .np-ab-slider .np-ab-fill {
@@ -294,7 +326,7 @@
   font-weight: 700;
   padding: 8px 6px;
   border-radius: 8px;
-  cursor: default;
+  cursor: pointer;
   transition: all 0.15s;
 }
 

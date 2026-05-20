@@ -1,6 +1,7 @@
 import {
   CLIENT_JOIN_ROOM,
   CLIENT_LEAVE_ROOM,
+  CLIENT_PLAYER_ACTION,
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_START_HAND,
@@ -11,6 +12,7 @@ import {
 } from '@neonpoker/shared';
 import type {
   HandResultPayload,
+  PlayerActionIntent,
   PlayerGameState,
   RoomStatePayload,
   ServerErrorPayload,
@@ -89,6 +91,7 @@ function attachGlobalListeners(client: Socket): void {
 
   client.on(SERVER_HAND_RESULT, (payload: HandResultPayload) => {
     useGameStore.getState().setHandResult(payload);
+    useGameStore.getState().setSubmittingAction(false);
     for (const listener of handResultListeners) {
       listener(payload);
     }
@@ -223,6 +226,14 @@ export function requestGameState(roomId: string): void {
 
 export function startHand(roomId: string): void {
   socket?.emit(CLIENT_START_HAND, { roomId });
+}
+
+export function sendPlayerAction(
+  roomId: string,
+  action: PlayerActionIntent,
+): void {
+  useGameStore.getState().setSubmittingAction(true);
+  socket?.emit(CLIENT_PLAYER_ACTION, { roomId, action });
 }
 
 export function onGameState(

@@ -13,6 +13,7 @@ import { useSessionStore } from '../../state/sessionStore';
 vi.mock('../../net/socket', () => ({
   requestGameState: vi.fn(),
   startHand: vi.fn(),
+  sendPlayerAction: vi.fn(),
   onGameState: vi.fn(() => () => {}),
   onHandResult: vi.fn(() => () => {}),
 }));
@@ -81,6 +82,17 @@ const liveState: PlayerGameState = {
   street: 'PRE-FLOP',
   pot: { total: 3, sidePots: [] },
   handId: 'hand-1',
+  activeSeatIndex: 0,
+  availableActions: {
+    canFold: true,
+    canCheck: false,
+    canCall: true,
+    callAmount: 1,
+    canRaise: true,
+    minRaise: 4,
+    maxRaise: 200,
+    canAllIn: true,
+  },
   seats: [
     {
       ...idlePreHandState.seats[0]!,
@@ -255,5 +267,75 @@ describe('TablePage live room', () => {
     expect(screen.getByText(/ABC123 · 1\/9 · WAITING/i)).toBeInTheDocument();
     expect(screen.getByText('ljhh')).toBeInTheDocument();
     expect(screen.queryByText('Player')).not.toBeInTheDocument();
+  });
+
+  it('sends fold through socket API when viewer is active', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState(liveState);
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /fold/i }));
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, { kind: 'fold' });
+  });
+
+  it('sends check/call/raise/allin through socket API', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      availableActions: {
+        canFold: true,
+        canCheck: true,
+        canCall: true,
+        callAmount: 1,
+        canRaise: true,
+        minRaise: 4,
+        maxRaise: 200,
+        canAllIn: true,
+      },
+    });
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: /check/i }));
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, { kind: 'check' });
+
+    fireEvent.click(screen.getByRole('button', { name: /call/i }));
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, { kind: 'call' });
+
+    fireEvent.click(screen.getByRole('button', { name: /^raise to/i }));
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, {
+      kind: 'raise',
+      amount: 4,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^all-in$/i }));
+    expect(socket.sendPlayerAction).toHaveBeenCalledWith(roomId, { kind: 'allin' });
+  });
+
+  it('does not mutate gameState locally after action click', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState(liveState);
+    const before = useGameStore.getState().gameState;
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /fold/i }));
+    expect(useGameStore.getState().gameState).toBe(before);
+  });
+
+  it('does not send action when viewer is not active', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      activeSeatIndex: 1,
+      availableActions: undefined,
+    });
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /fold/i }));
+    expect(socket.sendPlayerAction).not.toHaveBeenCalled();
+  });
+
+  it('surfaces SERVER_ERROR in action banner during hand', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState(liveState);
+    useGameStore.getState().setGameError('Not your turn');
+    renderTable();
+    expect(screen.getByText('Not your turn')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import {
+  CLIENT_PLAYER_ACTION,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_START_HAND,
   SERVER_ERROR,
@@ -22,6 +23,7 @@ import {
   joinRoom,
   requestGameState,
   resetSocketClientForTests,
+  sendPlayerAction,
   startHand,
 } from './socket';
 
@@ -308,6 +310,52 @@ describe('socket client', () => {
     expect(mockEmit).toHaveBeenCalledWith(CLIENT_START_HAND, {
       roomId: roomState.roomId,
     });
+  });
+
+  it('sendPlayerAction emits CLIENT_PLAYER_ACTION without seatIndex', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    sendPlayerAction(roomState.roomId, { kind: 'fold' });
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_PLAYER_ACTION, {
+      roomId: roomState.roomId,
+      action: { kind: 'fold' },
+    });
+    expect(mockEmit.mock.calls.at(-1)?.[1]).not.toHaveProperty('seatIndex');
+    expect(useGameStore.getState().isSubmittingAction).toBe(true);
+  });
+
+  it('SERVER_ERROR clears submitting state and surfaces gameError', async () => {
+    useGameStore.getState().setSubmittingAction(true);
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_ERROR, {
+      code: 'NOT_YOUR_TURN',
+      message: 'Not your turn',
+    });
+
+    expect(useGameStore.getState().isSubmittingAction).toBe(false);
+    expect(useGameStore.getState().gameError).toBe('Not your turn');
+  });
+
+  it('SERVER_GAME_STATE clears submitting state', async () => {
+    useGameStore.getState().setSubmittingAction(true);
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_GAME_STATE, gameState);
+
+    expect(useGameStore.getState().isSubmittingAction).toBe(false);
   });
 
   it('joinRoom resolves on SERVER_ROOM_STATE', async () => {

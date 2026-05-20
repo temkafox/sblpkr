@@ -30,7 +30,15 @@ describe('gameStore', () => {
     const s = useGameStore.getState();
     expect(s.isGameLoading).toBe(false);
     expect(s.gameError).toBeNull();
+    expect(s.isSubmittingAction).toBe(false);
     expect(s.gameState?.tableId).toBe('t1');
+  });
+
+  it('setGameError clears submitting state', () => {
+    useGameStore.getState().setSubmittingAction(true);
+    useGameStore.getState().setGameError('Not your turn');
+    expect(useGameStore.getState().isSubmittingAction).toBe(false);
+    expect(useGameStore.getState().gameError).toBe('Not your turn');
   });
 
   it('clearGameState resets all fields', () => {

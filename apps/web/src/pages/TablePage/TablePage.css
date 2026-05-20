@@ -44,6 +44,25 @@
   pointer-events: none;
 }
 
+.table-page__action-error {
+  position: absolute;
+  top: 12px;
+  right: 24px;
+  z-index: 61;
+  margin: 0;
+  max-width: 320px;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgba(255, 210, 220, 0.95);
+  background: rgba(40, 8, 16, 0.88);
+  border: 1px solid rgba(255, 46, 107, 0.45);
+  border-radius: var(--r-md);
+  pointer-events: none;
+}
+
 .table-page__pregame {
   position: absolute;
   top: 72px;

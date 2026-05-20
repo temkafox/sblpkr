@@ -14,11 +14,12 @@ import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
   createWaitingLiveTableView,
+  findViewerSeatIndex,
   isActiveHand,
 } from '../../lib/gameStateAdapter';
 import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
 import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
-import { requestGameState, startHand } from '../../net/socket';
+import { requestGameState, sendPlayerAction, startHand } from '../../net/socket';
 import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
@@ -29,6 +30,7 @@ export function TablePage() {
   const connectionStatus = useSessionStore((s) => s.connectionStatus);
   const gameState = useGameStore((s) => s.gameState);
   const isGameLoading = useGameStore((s) => s.isGameLoading);
+  const isSubmittingAction = useGameStore((s) => s.isSubmittingAction);
   const gameError = useGameStore((s) => s.gameError);
   const roomState = useRoomStore((s) => s.roomState);
 
@@ -45,6 +47,15 @@ export function TablePage() {
     isActiveHand(gameState) &&
     rosterAligned &&
     enoughPlayersForHand;
+
+  const viewerSeatIndex =
+    gameState != null ? findViewerSeatIndex(gameState, nickname) : null;
+  const availableActions = gameState?.availableActions;
+  const isMyTurn =
+    hasActiveHand &&
+    availableActions != null &&
+    viewerSeatIndex != null &&
+    gameState?.activeSeatIndex === viewerSeatIndex;
 
   useEffect(() => {
     if (!roomId) return;
@@ -84,6 +95,37 @@ export function TablePage() {
     startHand(roomId);
   }, [roomId, canStartHand]);
 
+  const emitAction = useCallback(
+    (action: Parameters<typeof sendPlayerAction>[1]) => {
+      if (!roomId || !isMyTurn || isSubmittingAction) return;
+      sendPlayerAction(roomId, action);
+    },
+    [roomId, isMyTurn, isSubmittingAction],
+  );
+
+  const handleFold = useCallback(() => {
+    emitAction({ kind: 'fold' });
+  }, [emitAction]);
+
+  const handleCheck = useCallback(() => {
+    emitAction({ kind: 'check' });
+  }, [emitAction]);
+
+  const handleCall = useCallback(() => {
+    emitAction({ kind: 'call' });
+  }, [emitAction]);
+
+  const handleRaise = useCallback(
+    (amount: number) => {
+      emitAction({ kind: 'raise', amount });
+    },
+    [emitAction],
+  );
+
+  const handleAllIn = useCallback(() => {
+    emitAction({ kind: 'allin' });
+  }, [emitAction]);
+
   const hasLiveFeed =
     connectionStatus === 'connected' ||
     gameState != null ||
@@ -102,6 +144,11 @@ export function TablePage() {
               ? 'Waiting for another player (need at least 2)'
               : null;
 
+  const actionErrorLabel =
+    handActive && gameError != null && gameError.length > 0
+      ? gameError
+      : null;
+
   const roomMeta =
     roomState != null
       ? formatRoomMetaLine(roomState, hasActiveHand ? gameState : null)
@@ -112,6 +159,11 @@ export function TablePage() {
       {statusLabel ? (
         <p className="table-page__status" aria-live="polite">
           {statusLabel}
+        </p>
+      ) : null}
+      {actionErrorLabel ? (
+        <p className="table-page__action-error" aria-live="polite">
+          {actionErrorLabel}
         </p>
       ) : null}
       {roomMeta ? (
@@ -148,7 +200,22 @@ export function TablePage() {
         gameState={tableView.gameState}
         handActive={handActive}
       />
-      {handActive ? <ActionBar mock={tableView.actionBar} /> : null}
+      {handActive ? (
+        <ActionBar
+          availableActions={availableActions}
+          potAmount={gameState?.pot.total ?? 0}
+          callAmount={availableActions?.callAmount ?? 0}
+          minRaise={availableActions?.minRaise ?? 0}
+          maxRaise={availableActions?.maxRaise ?? 0}
+          isMyTurn={isMyTurn}
+          isSubmittingAction={isSubmittingAction}
+          onFold={handleFold}
+          onCheck={handleCheck}
+          onCall={handleCall}
+          onRaise={handleRaise}
+          onAllIn={handleAllIn}
+        />
+      ) : null}
       <RightSidebar
         handHistory={tableView.handHistory}
         chatMessages={tableView.chatMessages}
