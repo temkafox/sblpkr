@@ -69,3 +69,17 @@ export class InsufficientChipsError extends PokerCoreError {
     this.name = 'InsufficientChipsError';
   }
 }
+
+export class InvalidHandError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidHandError';
+  }
+}
+
+export class DuplicateCardError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DuplicateCardError';
+  }
+}

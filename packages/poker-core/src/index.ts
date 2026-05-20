@@ -29,7 +29,9 @@ export { createInitialGameState } from './domain/game-state';
 export type { CorePlayerAction } from './domain/player-action';
 
 export {
+  DuplicateCardError,
   InvalidActionError,
+  InvalidHandError,
   InvalidTableStateError,
   CannotCallError,
   CannotCheckError,
@@ -40,6 +42,14 @@ export {
   PokerCoreError,
   SeatNotFoundError,
 } from './engine/errors';
+
+export type { EvaluatedHand } from './engine/hand-evaluator';
+export {
+  compareEvaluatedHands,
+  compareHands,
+  evaluateBestHand,
+  HandCategory,
+} from './engine/hand-evaluator';
 
 export {
   getActiveSeatIndexes,
