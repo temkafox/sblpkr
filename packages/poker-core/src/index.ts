@@ -62,6 +62,20 @@ export { getAvailableActions } from './engine/available-actions';
 export { applyAction } from './engine/actions';
 
 export {
+  applyAggressiveBetMetadata,
+  getMaximumRaiseTarget,
+  getMinimumRaiseTarget,
+  getRaiseSize,
+  isFullRaise,
+} from './engine/min-raise';
+
+export {
+  advanceStreet,
+  canAdvanceStreet,
+  getFirstToActPostflop,
+} from './engine/street';
+
+export {
   advanceTurnAfterAction,
   isBettingRoundComplete,
   needsToAct,

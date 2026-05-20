@@ -8,6 +8,7 @@ import {
   CoreGameState,
   createInitialGameState,
   createSeededRandom,
+  getAvailableActions,
   InsufficientChipsError,
   InvalidActionError,
   isBettingRoundComplete,
@@ -230,6 +231,76 @@ describe('applyAction', () => {
 
     // Betting closed — activeSeatIndex cleared — further attempts are out of turn.
     expect(() => applyAction(g, sbSeat, { kind: 'check' })).toThrow(OutOfTurnError);
+  });
+
+  it('raise committing entire stack may be below minimum increment', () => {
+    const g = sixMaxThreeWay();
+    const seat = g.table.activeSeatIndex!;
+    const cheat: CoreGameState = Object.freeze({
+      ...g,
+      table: Object.freeze({ ...g.table, activeSeatIndex: seat }),
+      playersById: Object.freeze({
+        ...g.playersById,
+        utg: Object.freeze({
+          ...g.playersById.utg!,
+          currentBet: 30,
+          chips: 7,
+        }),
+      }),
+      hand: Object.freeze({
+        ...g.hand!,
+        currentBet: 30,
+        minRaise: 20,
+        lastRaiseAmount: 20,
+        actedSeatIndexes: Object.freeze([3, 5]),
+        raiseFrozenSeatIndexes: Object.freeze([]),
+      }),
+    });
+
+    const next = applyAction(cheat, seat, { kind: 'raise', amount: 37 });
+
+    expect(next.hand?.currentBet).toBe(37);
+    expect(next.hand?.minRaise).toBe(20);
+    expect(next.playersById.utg?.chips).toBe(0);
+    expect(next.playersById.utg?.isAllIn).toBe(true);
+    expect(next.hand?.raiseFrozenSeatIndexes.slice().sort((a, b) => a - b)).toEqual([
+      3, 5,
+    ]);
+  });
+
+  it('freezes earlier actors from raising after an incomplete shove', () => {
+    const g = sixMaxThreeWay();
+    const seat = g.table.activeSeatIndex!;
+    const cheat: CoreGameState = Object.freeze({
+      ...g,
+      table: Object.freeze({ ...g.table, activeSeatIndex: seat }),
+      playersById: Object.freeze({
+        ...g.playersById,
+        utg: Object.freeze({
+          ...g.playersById.utg!,
+          currentBet: 30,
+          chips: 7,
+        }),
+      }),
+      hand: Object.freeze({
+        ...g.hand!,
+        currentBet: 30,
+        minRaise: 20,
+        actedSeatIndexes: Object.freeze([3, 5]),
+        raiseFrozenSeatIndexes: Object.freeze([]),
+      }),
+    });
+
+    const afterInc = applyAction(cheat, seat, { kind: 'raise', amount: 37 });
+    const nextSeat = afterInc.table.activeSeatIndex!;
+    expect(afterInc.hand?.raiseFrozenSeatIndexes.includes(nextSeat)).toBe(true);
+
+    const opts = getAvailableActions(afterInc, nextSeat);
+    expect(opts.canRaise).toBe(false);
+    expect(opts.canCall).toBe(true);
+    expect(opts.callAmount).toBe(
+      afterInc.hand!.currentBet - afterInc.playersById[afterInc.table.seats[nextSeat]!.playerId!]!.currentBet,
+    );
   });
 
   it('does not mutate the incoming snapshot', () => {

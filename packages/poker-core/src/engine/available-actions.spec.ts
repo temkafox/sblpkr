@@ -80,4 +80,35 @@ describe('getAvailableActions', () => {
     expect(a.minRaise).toBe(g.hand!.currentBet + g.hand!.minRaise);
     expect(a.maxRaise).toBe(g.playersById.utg!.currentBet + g.playersById.utg!.chips);
   });
+
+  it('disables raising when seat is flagged raise-frozen', () => {
+    const g = sixMaxThreeWay();
+    const hero = g.table.activeSeatIndex!;
+    const pid = g.table.seats[hero]!.playerId!;
+    const player = g.playersById[pid]!;
+
+    const patched: CoreGameState = Object.freeze({
+      ...g,
+      table: Object.freeze({
+        ...g.table,
+        activeSeatIndex: hero,
+      }),
+      playersById: Object.freeze({
+        ...g.playersById,
+        [pid]: Object.freeze({
+          ...player,
+          currentBet: g.hand!.currentBet - 12,
+        }),
+      }),
+      hand: Object.freeze({
+        ...g.hand!,
+        raiseFrozenSeatIndexes: Object.freeze([hero]),
+      }),
+    });
+
+    const a = getAvailableActions(patched, hero);
+    expect(a.canCall).toBe(true);
+    expect(a.canRaise).toBe(false);
+    expect(a.callAmount).toBe(12);
+  });
 });

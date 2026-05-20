@@ -16,5 +16,9 @@ export type HandState = {
   readonly lastRaiseAmount: number;
   readonly lastAggressorSeatIndex: SeatIndex | null;
   readonly actedSeatIndexes: readonly SeatIndex[];
+  /** Seats barred from raising after an incomplete all-in until the next full raise (Phase 4C). */
+  readonly raiseFrozenSeatIndexes: readonly SeatIndex[];
+  /** Board dealt through river — awaiting evaluator / Phase 4D (no betting). */
+  readonly showdownReady: boolean;
   readonly isComplete: boolean;
 };

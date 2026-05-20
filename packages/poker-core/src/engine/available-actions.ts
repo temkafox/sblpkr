@@ -1,6 +1,7 @@
 import type { CoreGameState } from '../domain/game-state';
 import type { SeatIndex } from '../domain/seat';
 
+import { getMaximumRaiseTarget, getMinimumRaiseTarget } from './min-raise';
 import { getPlayerAtSeat } from './seat-utils';
 
 /** Mirrors `@neonpoker/shared` `AvailableActions` — totals are raise‑to amounts on this street. */
@@ -33,6 +34,7 @@ export function getAvailableActions(
 ): CoreAvailableActions {
   const hand = state.hand;
   if (hand == null || hand.isComplete) return DISABLED;
+  if (hand.showdownReady || hand.street === 'SHOWDOWN') return DISABLED;
 
   const turn = state.table.activeSeatIndex;
   if (turn == null || turn !== seatIndex) return DISABLED;
@@ -47,10 +49,14 @@ export function getAvailableActions(
   const callAmount = facing > 0 ? Math.min(facing, p.chips) : 0;
   const canCall = facing > 0 && p.chips > 0;
 
-  const minTotal = hand.currentBet + hand.minRaise;
-  const maxTotal = p.currentBet + p.chips;
+  const minTotal = getMinimumRaiseTarget(state);
+  const maxTotal = getMaximumRaiseTarget(state, seatIndex);
+  const raiseFrozen = hand.raiseFrozenSeatIndexes.includes(seatIndex);
   const canRaise =
-    p.chips > 0 && minTotal <= maxTotal && minTotal > hand.currentBet;
+    !raiseFrozen &&
+    p.chips > 0 &&
+    minTotal <= maxTotal &&
+    minTotal > hand.currentBet;
 
   return Object.freeze({
     canFold: true,

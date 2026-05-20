@@ -8,7 +8,6 @@ import {
   advanceTurnAfterAction,
   isBettingRoundComplete,
   mergeHandPotTotal,
-  resetActedAfterAggression,
 } from './betting-round';
 import {
   CannotCallError,
@@ -19,6 +18,7 @@ import {
   InvalidTableStateError,
   OutOfTurnError,
 } from './errors';
+import { applyAggressiveBetMetadata, getMinimumRaiseTarget } from './min-raise';
 import { getPlayerAtSeat } from './seat-utils';
 
 function clonePlayers(
@@ -41,6 +41,10 @@ export function applyAction(
     throw new InvalidTableStateError('No active hand');
   }
 
+  if (hand.showdownReady || hand.street === 'SHOWDOWN') {
+    throw new InvalidTableStateError('Betting closed');
+  }
+
   const turn = state.table.activeSeatIndex;
   if (turn == null || turn !== seatIndex) {
     throw new OutOfTurnError('Action out of turn');
@@ -52,14 +56,19 @@ export function applyAction(
   }
 
   const players = clonePlayers(state.playersById);
-  let nextHand = hand;
+
+  let nextState: CoreGameState;
 
   switch (action.kind) {
     case 'fold': {
       players[p.playerId] = Object.freeze({ ...p, hasFolded: true });
-      nextHand = Object.freeze({
-        ...hand,
-        actedSeatIndexes: appendActedSeat(hand, seatIndex),
+      nextState = Object.freeze({
+        ...state,
+        playersById: Object.freeze(players),
+        hand: Object.freeze({
+          ...hand,
+          actedSeatIndexes: appendActedSeat(hand, seatIndex),
+        }),
       });
       break;
     }
@@ -67,9 +76,13 @@ export function applyAction(
       if (p.currentBet !== hand.currentBet) {
         throw new CannotCheckError('Cannot check while facing a bet');
       }
-      nextHand = Object.freeze({
-        ...hand,
-        actedSeatIndexes: appendActedSeat(hand, seatIndex),
+      nextState = Object.freeze({
+        ...state,
+        playersById: Object.freeze(players),
+        hand: Object.freeze({
+          ...hand,
+          actedSeatIndexes: appendActedSeat(hand, seatIndex),
+        }),
       });
       break;
     }
@@ -90,16 +103,20 @@ export function applyAction(
         totalCommitted,
         isAllIn,
       });
-      nextHand = Object.freeze({
-        ...hand,
-        actedSeatIndexes: appendActedSeat(hand, seatIndex),
+      nextState = Object.freeze({
+        ...state,
+        playersById: Object.freeze(players),
+        hand: Object.freeze({
+          ...hand,
+          actedSeatIndexes: appendActedSeat(hand, seatIndex),
+        }),
       });
       break;
     }
     case 'raise': {
       const target = action.amount;
       const maxTotal = p.currentBet + p.chips;
-      const minLegal = hand.currentBet + hand.minRaise;
+      const minLegal = getMinimumRaiseTarget(state);
 
       if (target <= hand.currentBet) {
         throw new CannotRaiseError('Raise target must exceed current bet');
@@ -113,39 +130,27 @@ export function applyAction(
 
       const additional = target - p.currentBet;
       const chips = p.chips - additional;
-      const isAllIn = chips === 0;
 
       players[p.playerId] = Object.freeze({
         ...p,
         chips,
         currentBet: target,
         totalCommitted: p.totalCommitted + additional,
-        isAllIn,
+        isAllIn: chips === 0,
       });
 
-      const increment = target - hand.currentBet;
-      const fullRaise = increment >= hand.minRaise;
-
-      let acted: readonly SeatIndex[];
-      let nextMinRaise = hand.minRaise;
-      let nextLastRaise = hand.lastRaiseAmount;
-
-      if (fullRaise) {
-        acted = resetActedAfterAggression(seatIndex);
-        nextMinRaise = increment;
-        nextLastRaise = increment;
-      } else {
-        acted = appendActedSeat(hand, seatIndex);
-      }
-
-      nextHand = Object.freeze({
-        ...hand,
-        currentBet: target,
-        actedSeatIndexes: acted,
-        lastAggressorSeatIndex: seatIndex,
-        minRaise: nextMinRaise,
-        lastRaiseAmount: nextLastRaise,
+      const interim = Object.freeze({
+        ...state,
+        playersById: Object.freeze(players),
+        hand,
       });
+
+      nextState = applyAggressiveBetMetadata(
+        interim,
+        seatIndex,
+        hand.currentBet,
+        target,
+      );
       break;
     }
     case 'allin': {
@@ -163,57 +168,43 @@ export function applyAction(
         isAllIn: true,
       });
 
-      let acted: readonly SeatIndex[];
-      let nextBet = hand.currentBet;
-      let nextAgg = hand.lastAggressorSeatIndex;
-      let nextMinRaise = hand.minRaise;
-      let nextLastRaise = hand.lastRaiseAmount;
+      const interim = Object.freeze({
+        ...state,
+        playersById: Object.freeze(players),
+        hand,
+      });
 
       if (target > hand.currentBet) {
-        const increment = target - hand.currentBet;
-        nextBet = target;
-        nextAgg = seatIndex;
-        const fullRaise = increment >= hand.minRaise;
-        if (fullRaise) {
-          acted = resetActedAfterAggression(seatIndex);
-          nextMinRaise = increment;
-          nextLastRaise = increment;
-        } else {
-          acted = appendActedSeat(hand, seatIndex);
-        }
+        nextState = applyAggressiveBetMetadata(
+          interim,
+          seatIndex,
+          hand.currentBet,
+          target,
+        );
       } else {
-        acted = appendActedSeat(hand, seatIndex);
+        nextState = Object.freeze({
+          ...interim,
+          hand: Object.freeze({
+            ...hand,
+            actedSeatIndexes: appendActedSeat(hand, seatIndex),
+          }),
+        });
       }
-
-      nextHand = Object.freeze({
-        ...hand,
-        currentBet: nextBet,
-        lastAggressorSeatIndex: nextAgg,
-        actedSeatIndexes: acted,
-        minRaise: nextMinRaise,
-        lastRaiseAmount: nextLastRaise,
-      });
       break;
     }
   }
 
-  let next: CoreGameState = Object.freeze({
-    ...state,
-    playersById: Object.freeze(players),
-    hand: nextHand,
-  });
+  nextState = mergeHandPotTotal(nextState);
 
-  next = mergeHandPotTotal(next);
-
-  if (isBettingRoundComplete(next)) {
+  if (isBettingRoundComplete(nextState)) {
     return Object.freeze({
-      ...next,
+      ...nextState,
       table: Object.freeze({
-        ...next.table,
+        ...nextState.table,
         activeSeatIndex: null,
       }),
     });
   }
 
-  return advanceTurnAfterAction(next);
+  return advanceTurnAfterAction(nextState);
 }

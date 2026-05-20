@@ -34,6 +34,7 @@ export function getContestantSeatIndexes(state: CoreGameState): SeatIndex[] {
 export function needsToAct(state: CoreGameState, seat: SeatIndex): boolean {
   const hand = state.hand;
   if (hand == null || hand.isComplete) return false;
+  if (hand.showdownReady || hand.street === 'SHOWDOWN') return false;
 
   const p = getPlayerAtSeat(state, seat);
   if (p == null || p.hasFolded || p.isSittingOut || p.isAllIn) return false;
@@ -79,6 +80,7 @@ export function mergeHandPotTotal(state: CoreGameState): CoreGameState {
 export function isBettingRoundComplete(state: CoreGameState): boolean {
   const hand = state.hand;
   if (hand == null || hand.isComplete) return false;
+  if (hand.showdownReady || hand.street === 'SHOWDOWN') return false;
 
   const contenders = state.table.seats
     .map((s) => getPlayerAtSeat(state, s.seatIndex))

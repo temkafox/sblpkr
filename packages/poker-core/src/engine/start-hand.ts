@@ -163,6 +163,8 @@ export function startHand(
     lastRaiseAmount: stateWithButton.table.bigBlind,
     lastAggressorSeatIndex: bbSeat,
     actedSeatIndexes: Object.freeze([]),
+    raiseFrozenSeatIndexes: Object.freeze([]),
+    showdownReady: false,
     isComplete: false,
   });
 
