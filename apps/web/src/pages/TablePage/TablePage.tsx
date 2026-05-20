@@ -14,8 +14,9 @@ import { RightSidebar } from '../../components/sidebar/RightSidebar';
 import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
+  countSeatsWithChips,
   createWaitingLiveTableView,
-  findViewerSeatIndex,
+  resolveViewerServerSeatIndex,
   isActiveHand,
 } from '../../lib/gameStateAdapter';
 import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
@@ -45,6 +46,9 @@ export function TablePage() {
     gameStateMatchesRoomRoster(gameState, roomState);
   const enoughPlayersForHand =
     roomState == null || playerCount >= minPlayersToStart;
+  const eligibleForHand =
+    gameState != null ? countSeatsWithChips(gameState) : playerCount;
+  const enoughChipsForHand = eligibleForHand >= minPlayersToStart;
   const hasActiveHand =
     isActiveHand(gameState) &&
     rosterAligned &&
@@ -57,7 +61,9 @@ export function TablePage() {
     handResult.handId === gameState?.handId;
 
   const viewerSeatIndex =
-    gameState != null ? findViewerSeatIndex(gameState, nickname) : null;
+    gameState != null
+      ? resolveViewerServerSeatIndex(gameState, nickname)
+      : null;
   const availableActions = gameState?.availableActions;
   const isMyTurn =
     handInProgress &&
@@ -93,6 +99,7 @@ export function TablePage() {
     connectionStatus === 'connected' &&
     roomId != null &&
     playerCount >= minPlayersToStart &&
+    enoughChipsForHand &&
     !hasActiveHand;
 
   const canStartNextHand =
@@ -100,10 +107,17 @@ export function TablePage() {
     connectionStatus === 'connected' &&
     roomId != null &&
     playerCount >= minPlayersToStart &&
+    enoughChipsForHand &&
     showHandResult;
 
   const waitingForPlayers =
     isLiveRoom && !hasActiveHand && playerCount < minPlayersToStart;
+
+  const waitingForChips =
+    isLiveRoom &&
+    !handInProgress &&
+    playerCount >= minPlayersToStart &&
+    !enoughChipsForHand;
 
   const handleStartHand = useCallback(() => {
     if (!roomId || !canStartHand) return;
@@ -160,9 +174,11 @@ export function TablePage() {
           ? 'Loading game state…'
           : gameError && !hasLiveFeed
             ? gameError
-            : waitingForPlayers
-              ? 'Waiting for another player (need at least 2)'
-              : null;
+            : waitingForChips
+              ? 'Not enough players with chips — waiting for rebuy'
+              : waitingForPlayers
+                ? 'Waiting for another player (need at least 2)'
+                : null;
 
   const actionErrorLabel =
     handInProgress && gameError != null && gameError.length > 0

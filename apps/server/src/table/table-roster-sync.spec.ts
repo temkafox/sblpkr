@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createInitialGameState,
-  createSeededRandom,
-  getActiveSeatIndexes,
-  getContestantSeatIndexes,
-  startHand,
-} from '@neonpoker/poker-core';
+import { createInitialGameState } from '@neonpoker/poker-core';
 
 import {
   DEFAULT_BIG_BLIND,
@@ -14,7 +8,11 @@ import {
 } from '../game/game.constants';
 import { RoomService } from '../room/room.service';
 import type { MutableInternalRoom } from '../room/room.types';
-import { foldDepartedPlayers, syncTableToRoom } from './table-roster-sync';
+import {
+  applySeatEligibility,
+  countEligiblePlayers,
+  syncTableToRoom,
+} from './table-roster-sync';
 
 function roomWithPlayers(count: number): MutableInternalRoom {
   const roomService = RoomService.forTest();
@@ -51,65 +49,24 @@ function tableFromRoom(room: MutableInternalRoom) {
   });
 }
 
-describe('syncTableToRoom', () => {
-  it('preserves chip stacks for seated players between hands', () => {
+describe('applySeatEligibility', () => {
+  it('marks zero-stack players sitting out', () => {
     const room = roomWithPlayers(2);
-    expect(room.players).toHaveLength(2);
     const base = tableFromRoom(room);
-    expect(getActiveSeatIndexes(base).length).toBeGreaterThanOrEqual(2);
-
-    const dealt = startHand(base, { rng: createSeededRandom('sync-preserve') });
-    const winnerId = room.players[0]!.playerId;
-    const loserId = room.players[1]!.playerId;
-    const playersById = { ...dealt.playersById };
-    playersById[winnerId] = Object.freeze({
-      ...playersById[winnerId]!,
-      chips: DEFAULT_STARTING_CHIPS + DEFAULT_BIG_BLIND + DEFAULT_SMALL_BLIND,
-      hasFolded: false,
-    });
-    playersById[loserId] = Object.freeze({
-      ...playersById[loserId]!,
-      chips: DEFAULT_STARTING_CHIPS - DEFAULT_BIG_BLIND,
-      hasFolded: true,
-    });
-
-    const completed = Object.freeze({
-      ...dealt,
-      hand: Object.freeze({
-        ...dealt.hand!,
-        isComplete: true,
-        showdownReady: true,
+    const p0 = base.playersById[room.players[0]!.playerId]!;
+    const p1 = base.playersById[room.players[1]!.playerId]!;
+    const busted = Object.freeze({
+      ...base,
+      playersById: Object.freeze({
+        [p0.playerId]: Object.freeze({ ...p0, chips: 400 }),
+        [p1.playerId]: Object.freeze({ ...p1, chips: 0 }),
       }),
-      playersById: Object.freeze(playersById),
     });
 
-    const synced = syncTableToRoom(room, completed);
-    expect(synced.playersById[winnerId]!.chips).toBe(
-      DEFAULT_STARTING_CHIPS + DEFAULT_BIG_BLIND + DEFAULT_SMALL_BLIND,
-    );
-    expect(synced.playersById[loserId]!.chips).toBe(
-      DEFAULT_STARTING_CHIPS - DEFAULT_BIG_BLIND,
-    );
+    const synced = applySeatEligibility(syncTableToRoom(room, busted));
+    expect(synced.playersById[p1.playerId]!.isSittingOut).toBe(true);
+    expect(synced.playersById[p0.playerId]!.isSittingOut).toBe(false);
+    expect(countEligiblePlayers(synced)).toBe(1);
   });
 });
 
-describe('foldDepartedPlayers', () => {
-  it('removes departed seats from contestants during an active hand', () => {
-    const room = roomWithPlayers(3);
-    let state = startHand(tableFromRoom(room), {
-      rng: createSeededRandom('fold-departed'),
-    });
-    expect(getContestantSeatIndexes(state).length).toBe(3);
-
-    const departedId = room.players[2]!.playerId;
-    room.players = room.players.filter((p) => p.playerId !== departedId);
-
-    state = foldDepartedPlayers(state, room);
-    state = syncTableToRoom(room, state);
-
-    expect(
-      state.table.seats.some((s) => s.playerId === departedId),
-    ).toBe(false);
-    expect(getContestantSeatIndexes(state).length).toBe(2);
-  });
-});

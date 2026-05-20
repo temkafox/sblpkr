@@ -51,7 +51,8 @@ export function SeatLayer({
           showOppHoles &&
           !pos.hero &&
           st.status !== 'sitout' &&
-          (st.showOppBackcards ?? true);
+          ((st.showOppBackcards ?? false) ||
+            (st.oppHoleCards != null && st.oppHoleCards.length >= 2));
 
         const showBet = showBets && st.bet > 0;
         const bo = betOffset(pos.dir, w, h);

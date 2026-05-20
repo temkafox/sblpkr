@@ -78,14 +78,21 @@ export interface PlayerSeatProps {
   showHoles: boolean;
 }
 
-export function PlayerSeat({ player, state: st, position: pos, showHoles }: PlayerSeatProps) {
+export function PlayerSeat({
+  player,
+  state: st,
+  position: pos,
+  showHoles,
+}: PlayerSeatProps) {
   const w = pos.w || 244;
   const h = pos.h || 84;
   const states = opponentStateClass(st.status);
 
   return (
     <div className={`seat ${states}`} style={{ left: pos.x, top: pos.y, width: w, height: h }}>
-      {showHoles ? <OppHoles folded={st.status === 'fold'} /> : null}
+      {showHoles ? (
+        <OppHoles folded={st.status === 'fold'} revealedCards={st.oppHoleCards} />
+      ) : null}
       <div className="body">
         <div className="body-inner">
           <div className="name">{player.name}</div>

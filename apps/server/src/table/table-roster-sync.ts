@@ -184,9 +184,45 @@ export function syncTableToRoom(
     seats: Object.freeze(seats),
   });
 
+  return applySeatEligibility(
+    Object.freeze({
+      table,
+      hand: existing.hand,
+      playersById: Object.freeze(playersById),
+    }),
+  );
+}
+
+/** Players with chips > 0 who are seated and not sitting out. */
+export function countEligiblePlayers(state: CoreGameState): number {
+  let count = 0;
+  for (const seat of state.table.seats) {
+    const p = getPlayerAtSeat(state, seat.seatIndex);
+    if (p != null && p.chips > 0 && !p.isSittingOut) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** Mark zero-stack (and negative) players sitting out; clear sit-out when they have chips. */
+export function applySeatEligibility(state: CoreGameState): CoreGameState {
+  const playersById = clonePlayers(state.playersById);
+
+  for (const pid of Object.keys(playersById)) {
+    const p = playersById[pid]!;
+    const sittingOut = p.chips <= 0;
+    if (p.isSittingOut === sittingOut) {
+      continue;
+    }
+    playersById[pid] = Object.freeze({
+      ...p,
+      isSittingOut: sittingOut,
+    });
+  }
+
   return Object.freeze({
-    table,
-    hand: existing.hand,
+    ...state,
     playersById: Object.freeze(playersById),
   });
 }

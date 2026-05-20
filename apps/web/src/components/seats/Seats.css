@@ -38,6 +38,35 @@
   margin-left: -22px;
 }
 
+.np-opp-holes--revealed .np-card-face {
+  width: 50px;
+  height: 70px;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.45) inset,
+    0 0 0 1px rgba(139, 92, 255, 0.7),
+    0 0 12px rgba(139, 92, 255, 0.55),
+    0 6px 14px rgba(0, 0, 0, 0.7);
+}
+
+.np-opp-holes--revealed .np-card-face:first-child {
+  transform: rotate(-9deg);
+}
+
+.np-opp-holes--revealed .np-card-face:nth-child(2) {
+  transform: rotate(9deg);
+  margin-left: -22px;
+}
+
+.np-opp-holes--revealed .np-card-rank {
+  font-size: 14px;
+}
+
+.np-opp-holes--revealed .np-card-suit,
+.np-opp-holes--revealed .np-card-suit-big {
+  font-size: 12px;
+}
+
 /* ----- Seats ----- */
 
 .seat {

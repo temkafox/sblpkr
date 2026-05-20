@@ -39,6 +39,7 @@ const duoRoom: RoomStatePayload = {
 const idlePreHandState: PlayerGameState = {
   tableId: roomId,
   maxSeats: 9,
+  viewerSeatIndex: 0,
   street: null,
   boardCards: [],
   pot: { total: 0, sidePots: [] },
@@ -359,6 +360,7 @@ describe('TablePage live room', () => {
     useGameStore.getState().setGameState({
       ...liveState,
       handComplete: true,
+      handEndKind: 'FOLD_WIN',
       street: 'SHOWDOWN',
       activeSeatIndex: null,
       availableActions: undefined,
@@ -371,9 +373,38 @@ describe('TablePage live room', () => {
       isFoldWin: true,
     });
     const { container } = renderTable();
-    expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
+    expect(container.querySelector('.table-page__room-meta')?.textContent).toMatch(
+      /HAND COMPLETE · FOLD WIN/i,
+    );
     expect(screen.getByText('+$15')).toBeInTheDocument();
     expect(container.querySelector('.np-action-bar')).toBeNull();
+  });
+
+  it('hides Start Next Hand when fewer than two players have chips', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      seats: [
+        { ...liveState.seats[0]!, stack: 400 },
+        { ...liveState.seats[1]!, stack: 0, isSittingOut: true, holeCards: null, holeCardCount: null },
+      ],
+    });
+    useGameStore.getState().setHandResult({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 400 },
+      totalAwarded: 400,
+    });
+    const { container } = renderTable();
+    expect(
+      screen.queryByRole('button', { name: /start next hand/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('.table-page__status')?.textContent,
+    ).toMatch(/not enough players with chips/i);
   });
 
   it('Start Next Hand emits startHand when hand is complete', () => {

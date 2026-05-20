@@ -38,6 +38,26 @@ function withPlayerPatch(
 describe('startHand', () => {
   const makeRng = () => createSeededRandom('phase4a-start-hand-tests');
 
+  it('skips zero-chip seated players for deal and blinds', () => {
+    const base = createInitialGameState({
+      table: {
+        tableId: 't',
+        maxSeats: 6,
+        smallBlind: 5,
+        bigBlind: 10,
+      },
+      players: [
+        { playerId: 'a', seatIndex: 0, startingChips: 500 },
+        { playerId: 'b', seatIndex: 1, startingChips: 500 },
+        { playerId: 'busted', seatIndex: 2, startingChips: 0 },
+      ],
+    });
+    const bustedMarked = withPlayerPatch(base, 'busted', { isSittingOut: true });
+    const started = startHand(bustedMarked, { rng: makeRng(), handId: 'h-bust' });
+    expect(started.playersById.busted!.holeCards.length).toBe(0);
+    expect(started.table.activeSeatIndex).not.toBe(2);
+  });
+
   it('rejects fewer than two active players', () => {
     const lonely = createInitialGameState({
       table: {

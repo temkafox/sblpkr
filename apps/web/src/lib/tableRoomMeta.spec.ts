@@ -17,6 +17,7 @@ const room: RoomStatePayload = {
 const baseGame: PlayerGameState = {
   tableId: 'room-1',
   maxSeats: 9,
+  viewerSeatIndex: 0,
   street: null,
   boardCards: [],
   pot: { total: 0, sidePots: [] },
@@ -47,6 +48,40 @@ describe('tableRoomMeta', () => {
     expect(formatHandPhaseLabel(preflop)).toBe('PRE-FLOP');
     expect(formatRoomMetaLine(room, preflop)).toBe('ABC123 · 2/9 · PRE-FLOP');
     expect(formatRoomMetaLine(room, preflop)).not.toContain('waiting for hand');
+  });
+
+  it('completed showdown hand shows HAND COMPLETE · SHOWDOWN', () => {
+    const state = {
+      ...baseGame,
+      handId: 'h1',
+      handComplete: true,
+      street: 'SHOWDOWN' as const,
+      handEndKind: 'SHOWDOWN' as const,
+    };
+    expect(formatHandPhaseLabel(state)).toBe('HAND COMPLETE · SHOWDOWN');
+    expect(formatRoomMetaLine(room, state)).toContain('HAND COMPLETE · SHOWDOWN');
+  });
+
+  it('completed fold-win shows HAND COMPLETE · FOLD WIN', () => {
+    const state = {
+      ...baseGame,
+      handId: 'h1',
+      handComplete: true,
+      street: 'RIVER' as const,
+      handEndKind: 'FOLD_WIN' as const,
+    };
+    expect(formatHandPhaseLabel(state)).toBe('HAND COMPLETE · FOLD WIN');
+    expect(formatRoomMetaLine(room, state)).not.toContain('PRE-FLOP');
+  });
+
+  it('completed hand without end kind shows HAND COMPLETE', () => {
+    const state = {
+      ...baseGame,
+      handId: 'h1',
+      handComplete: true,
+      street: 'SHOWDOWN' as const,
+    };
+    expect(formatHandPhaseLabel(state)).toBe('HAND COMPLETE');
   });
 
   it.each([

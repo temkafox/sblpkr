@@ -1,9 +1,15 @@
 import type { CoreGameState } from '@neonpoker/poker-core';
-import { getAvailableActions, getPlayerAtSeat } from '@neonpoker/poker-core';
+import {
+  getAvailableActions,
+  getContestantSeatIndexes,
+  getPlayerAtSeat,
+  syncPotsFromCommitments,
+} from '@neonpoker/poker-core';
 import type { SeatIndex } from '@neonpoker/poker-core';
 import type {
   AvailableActions,
   Card,
+  HandEndKind,
   PublicGameState,
   PlayerGameState,
   WireSeatView,
@@ -55,19 +61,59 @@ function mapPot(state: CoreGameState): PublicGameState['pot'] {
   };
 }
 
+/** True when the completed hand ended with a single remaining contestant (fold-down). */
+export function isFoldWinHand(state: CoreGameState): boolean {
+  const hand = state.hand;
+  if (hand == null || !hand.isComplete) {
+    return false;
+  }
+  return getContestantSeatIndexes(syncPotsFromCommitments(state)).length === 1;
+}
+
+function handEndKindForState(state: CoreGameState): HandEndKind | null {
+  const hand = state.hand;
+  if (hand == null || !hand.isComplete) {
+    return null;
+  }
+  return isFoldWinHand(state) ? 'FOLD_WIN' : 'SHOWDOWN';
+}
+
+function shouldRevealHoleCardsAtSeat(
+  state: CoreGameState,
+  seatIndex: SeatIndex,
+  viewerSeatIndex: SeatIndex | null,
+): boolean {
+  if (viewerSeatIndex === seatIndex) {
+    return true;
+  }
+
+  const hand = state.hand;
+  if (hand == null || !hand.isComplete || isFoldWinHand(state)) {
+    return false;
+  }
+
+  const player = getPlayerAtSeat(state, seatIndex);
+  return player != null && !player.hasFolded && player.holeCards.length > 0;
+}
+
 function holeCardsForSeat(
   state: CoreGameState,
   seatIndex: SeatIndex,
   viewerSeatIndex: SeatIndex | null,
 ): { holeCards: readonly Card[] | null; holeCardCount: number | null } {
   const player = getPlayerAtSeat(state, seatIndex);
-  if (player == null || player.holeCards.length === 0) {
+  if (
+    player == null ||
+    player.chips <= 0 ||
+    player.isSittingOut ||
+    player.holeCards.length === 0
+  ) {
     return { holeCards: null, holeCardCount: null };
   }
 
   const count = player.holeCards.length;
 
-  if (viewerSeatIndex === seatIndex) {
+  if (shouldRevealHoleCardsAtSeat(state, seatIndex, viewerSeatIndex)) {
     return {
       holeCards: [...player.holeCards],
       holeCardCount: count,
@@ -129,6 +175,7 @@ function baseView(
     handId: hand?.handId ?? null,
     handComplete: hand?.isComplete ?? false,
     showdownReady: hand?.showdownReady ?? false,
+    handEndKind: handEndKindForState(state),
   };
 }
 
@@ -164,6 +211,7 @@ export function toPlayerGameState(
 
   return {
     ...base,
+    viewerSeatIndex,
     ...(availableActions != null ? { availableActions: { ...availableActions } } : {}),
   };
 }
@@ -187,6 +235,7 @@ export function toIdlePlayerGameState(
     handId: null,
     handComplete: false,
     showdownReady: false,
+    handEndKind: null,
     seats: view.seats.map((seat) => ({
       ...seat,
       currentBet: 0,

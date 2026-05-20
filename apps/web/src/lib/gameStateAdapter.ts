@@ -32,6 +32,18 @@ export function isActiveHand(
   return state?.handId != null && state.handId.length > 0;
 }
 
+/** Seated players with stack > 0 (eligible for next hand in MVP). */
+export function countSeatsWithChips(
+  state: PlayerGameState | null | undefined,
+): number {
+  if (state == null) {
+    return 0;
+  }
+  return state.seats.filter(
+    (seat) => seat.playerId != null && seat.stack > 0,
+  ).length;
+}
+
 function preHandMockGameState(preset: SeatCount): MockGameState {
   return {
     seats: preset,
@@ -132,35 +144,52 @@ export function orderRoomPlayersForViewer<
   return [viewer, ...others];
 }
 
+/**
+ * Resolves the viewer's server seat index — never inferred from hole cards.
+ * Prefer explicit `viewerSeatIndex` from the server payload.
+ */
+export function resolveViewerServerSeatIndex(
+  state: PlayerGameState,
+  viewerNickname: string | null,
+): number {
+  const explicit = state.viewerSeatIndex;
+  if (Number.isInteger(explicit) && explicit >= 0) {
+    const byServer = state.seats.some((s) => s.seatIndex === explicit);
+    if (byServer) {
+      return explicit;
+    }
+  }
+
+  if (viewerNickname) {
+    const nick = viewerNickname.trim().toLowerCase();
+    const byNick = state.seats.find(
+      (s) => s.nickname?.trim().toLowerCase() === nick,
+    );
+    if (byNick != null) {
+      return byNick.seatIndex;
+    }
+  }
+
+  const firstOccupied = state.seats.find((s) => s.playerId != null);
+  return firstOccupied?.seatIndex ?? 0;
+}
+
+/** @deprecated Use {@link resolveViewerServerSeatIndex}. */
 export function findViewerSeatIndex(
   state: PlayerGameState,
   viewerNickname: string | null,
 ): number {
-  const withCards = state.seats.findIndex(
-    (s) => s.holeCards != null && s.holeCards.length > 0,
-  );
-  if (withCards >= 0) return withCards;
-
-  if (viewerNickname) {
-    const nick = viewerNickname.trim().toLowerCase();
-    const byNick = state.seats.findIndex(
-      (s) => s.nickname?.trim().toLowerCase() === nick,
-    );
-    if (byNick >= 0) return byNick;
-  }
-
-  const occupied = state.seats.findIndex((s) => s.playerId != null);
-  return occupied >= 0 ? occupied : 0;
+  return resolveViewerServerSeatIndex(state, viewerNickname);
 }
 
 /** Viewer first, then other occupied seats in server seat order. */
 export function orderOccupiedSeatsForViewer(
   seats: readonly WireSeatView[],
-  viewerIndexInArray: number,
+  viewerServerSeatIndex: number,
 ): WireSeatView[] {
   const occupied = seats.filter((s) => s.playerId != null);
-  const viewer = seats[viewerIndexInArray];
-  if (viewer?.playerId == null) {
+  const viewer = occupied.find((s) => s.seatIndex === viewerServerSeatIndex);
+  if (viewer == null) {
     return [...occupied].sort((a, b) => a.seatIndex - b.seatIndex);
   }
   const others = occupied
@@ -191,7 +220,7 @@ function seatStatus(
   seat: WireSeatView,
   activeSeatIndex: number | null,
 ): SeatStateMock['status'] {
-  if (seat.isSittingOut) return 'sitout';
+  if (seat.stack <= 0 || seat.isSittingOut) return 'sitout';
   if (seat.hasFolded) return 'fold';
   if (seat.isAllIn) return 'allin';
   if (activeSeatIndex === seat.seatIndex) return 'turn';
@@ -326,8 +355,14 @@ export function adaptPlayerGameState(
   viewerNickname: string | null,
   room: RoomStatePayload | null = null,
 ): AdaptedTableView {
-  const viewerIndex = findViewerSeatIndex(state, viewerNickname);
-  const ordered = orderOccupiedSeatsForViewer(state.seats, viewerIndex);
+  const viewerServerSeatIndex = resolveViewerServerSeatIndex(
+    state,
+    viewerNickname,
+  );
+  const ordered = orderOccupiedSeatsForViewer(
+    state.seats,
+    viewerServerSeatIndex,
+  );
   const occupiedCount = ordered.length;
   const preset = occupiedCountToLayoutPreset(occupiedCount);
   const layout = LAYOUTS[preset].slice(0, occupiedCount);
@@ -336,8 +371,6 @@ export function adaptPlayerGameState(
   ordered.forEach((seat, layoutIdx) => {
     serverToLayout.set(seat.seatIndex, layoutIdx);
   });
-
-  const viewerServerSeatIndex = ordered[0]?.seatIndex ?? 0;
 
   const playersBySeatIndex: PlayerMock[] = ordered.map((seat, layoutIdx) => {
     const name =
@@ -352,12 +385,19 @@ export function adaptPlayerGameState(
     };
   });
 
-  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map((seat, layoutIdx) => ({
-    status: seatStatus(seat, state.activeSeatIndex),
-    bet: seat.currentBet,
-    amount: seat.currentBet > 0 ? seat.currentBet : '',
-    showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
-  }));
+  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map((seat, layoutIdx) => {
+    const revealed =
+      layoutIdx !== 0 && seat.holeCards != null && seat.holeCards.length >= 2
+        ? [seat.holeCards[0]!, seat.holeCards[1]!]
+        : null;
+    return {
+      status: seatStatus(seat, state.activeSeatIndex),
+      bet: seat.currentBet,
+      amount: seat.currentBet > 0 ? seat.currentBet : '',
+      showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
+      oppHoleCards: revealed,
+    };
+  });
 
   const heroSeat = ordered[0];
   const heroHoleCards: [CardModel, CardModel] | null =

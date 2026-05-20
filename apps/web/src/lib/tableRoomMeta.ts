@@ -9,6 +9,18 @@ export function formatHandPhaseLabel(
   if (!isActiveHand(gameState)) {
     return 'WAITING';
   }
+
+  if (gameState!.handComplete) {
+    switch (gameState!.handEndKind) {
+      case 'FOLD_WIN':
+        return 'HAND COMPLETE · FOLD WIN';
+      case 'SHOWDOWN':
+        return 'HAND COMPLETE · SHOWDOWN';
+      default:
+        return 'HAND COMPLETE';
+    }
+  }
+
   const street = gameState!.street;
   if (street == null) {
     return 'WAITING';

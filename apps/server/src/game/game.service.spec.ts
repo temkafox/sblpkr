@@ -357,6 +357,54 @@ describe('GameService (Phase 6C1)', () => {
     );
   });
 
+  it('startHand rejects when fewer than two players have chips', () => {
+    const { roomService, tableService, game } = gameHarness('busted-start');
+    const roomId = seatRoom(roomService, 2, 6);
+
+    let state = game.startHand(roomId);
+    const winnerId = Object.values(state.playersById).find((p) => p.chips > 0)!
+      .playerId;
+    const loserId = Object.values(state.playersById).find((p) => p.playerId !== winnerId)!
+      .playerId;
+
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+      }),
+      playersById: Object.freeze({
+        ...state.playersById,
+        [winnerId]: Object.freeze({
+          ...state.playersById[winnerId]!,
+          chips: state.playersById[winnerId]!.chips + state.playersById[loserId]!.chips,
+        }),
+        [loserId]: Object.freeze({
+          ...state.playersById[loserId]!,
+          chips: 0,
+          holeCards: Object.freeze([]),
+          currentBet: 0,
+          totalCommitted: 0,
+        }),
+      }),
+    });
+    tableService.setTableState(roomId, state);
+
+    try {
+      game.startHand(roomId);
+      expect.fail('expected throw');
+    } catch (err) {
+      expect((err as GameOrchestrationError).code).toBe('NOT_ENOUGH_PLAYERS');
+      expect((err as Error).message).toContain('chips');
+    }
+
+    const idle = tableService.getTableState(roomId)!;
+    expect(idle.playersById[loserId]!.chips).toBe(0);
+    expect(idle.playersById[loserId]!.isSittingOut).toBe(true);
+    expect(idle.playersById[loserId]!.holeCards.length).toBe(0);
+  });
+
   it('reconcileAfterRosterChange folds a third player who left mid-hand', () => {
     const { roomService, game } = gameHarness('7e-leave-three');
     const roomId = seatRoom(roomService, 3, 6);

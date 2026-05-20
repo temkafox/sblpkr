@@ -20,13 +20,19 @@ export function getOccupiedSeatIndexes(state: CoreGameState): SeatIndex[] {
   return out.sort((a, b) => a - b);
 }
 
-/** Seated players who are not sitting out — eligible to receive cards / post blinds. */
+/** Seated players with chips who are not sitting out — eligible for deal / blinds. */
+
+export function isSeatEligibleForHand(
+  player: PlayerRuntimeState | null,
+): player is PlayerRuntimeState {
+  return player != null && !player.isSittingOut && player.chips > 0;
+}
 
 export function getActiveSeatIndexes(state: CoreGameState): SeatIndex[] {
   const out: SeatIndex[] = [];
   for (const s of state.table.seats) {
     const p = getPlayerAtSeat(state, s.seatIndex);
-    if (p != null && !p.isSittingOut) out.push(s.seatIndex);
+    if (isSeatEligibleForHand(p)) out.push(s.seatIndex);
   }
   return out.sort((a, b) => a - b);
 }
@@ -55,7 +61,7 @@ export function getNextActiveSeatIndex(
   for (let step = 1; step <= max; step++) {
     const seat = (fromSeatIndex + step) % max;
     const p = getPlayerAtSeat(state, seat);
-    if (p != null && !p.isSittingOut) return seat;
+    if (isSeatEligibleForHand(p)) return seat;
   }
   throw new SeatNotFoundError('No active seat found');
 }
@@ -109,7 +115,7 @@ export function getActiveSeatOrderClockwiseFrom(
   for (let offset = 0; offset < max; offset++) {
     const seat = (startSeat + offset) % max;
     const p = getPlayerAtSeat(state, seat);
-    if (p != null && !p.isSittingOut) out.push(seat);
+    if (isSeatEligibleForHand(p)) out.push(seat);
   }
   return out;
 }

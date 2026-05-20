@@ -29,6 +29,8 @@ const streetSchema = z.enum([
   'SHOWDOWN',
 ]);
 
+const handEndKindSchema = z.enum(['FOLD_WIN', 'SHOWDOWN']);
+
 const sidePotSchema = z.object({
   amount: ChipAmountSchema,
   eligibleSeatIndexes: z.array(z.number().int().nonnegative()),
@@ -77,9 +79,11 @@ export const PublicGameStateSchema = z.object({
   handId: z.string().nullable(),
   handComplete: z.boolean(),
   showdownReady: z.boolean(),
+  handEndKind: handEndKindSchema.nullable().optional(),
 });
 
 export const PlayerGameStateSchema = PublicGameStateSchema.extend({
+  viewerSeatIndex: z.number().int().nonnegative(),
   availableActions: availableActionsSchema.optional(),
 });
 
@@ -116,6 +120,7 @@ export const RequestGameStatePayloadSchema = z.object({
 export type WireSeatView = z.infer<typeof WireSeatViewSchema>;
 export type PublicGameState = z.infer<typeof PublicGameStateSchema>;
 export type PlayerGameState = z.infer<typeof PlayerGameStateSchema>;
+export type HandEndKind = z.infer<typeof handEndKindSchema>;
 export type HandResultPayload = z.infer<typeof HandResultPayloadSchema>;
 export type StartHandPayload = z.infer<typeof StartHandPayloadSchema>;
 export type RequestGameStatePayload = z.infer<typeof RequestGameStatePayloadSchema>;

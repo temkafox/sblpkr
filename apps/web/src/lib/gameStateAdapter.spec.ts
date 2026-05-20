@@ -5,12 +5,14 @@ import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
   boardRevealFromStreet,
+  countSeatsWithChips,
   isActiveHand,
   NO_HAND_SEAT_INDEX,
   occupiedCountToLayoutPreset,
   orderOccupiedSeatsForViewer,
   orderRoomPlayersForViewer,
   resolveSeatNickname,
+  resolveViewerServerSeatIndex,
   shouldShowOppBackcards,
 } from './gameStateAdapter';
 
@@ -68,6 +70,7 @@ function baseState(overrides: Partial<PlayerGameState> = {}): PlayerGameState {
     handId: 'hand-1',
     handComplete: false,
     showdownReady: false,
+    viewerSeatIndex: 0,
     seats: [
       occupiedSeat(0, 'p-hero', 'Hero', {
         currentBet: 5,
@@ -203,10 +206,196 @@ describe('gameStateAdapter', () => {
     expect(state.seats[1]!.holeCards).toBeNull();
   });
 
+  it('maps revealed opponent hole cards after showdown completion', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        handEndKind: 'SHOWDOWN',
+        street: 'SHOWDOWN',
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            holeCards: [
+              { r: 'A', s: 's' },
+              { r: 'K', s: 'h' },
+            ],
+            holeCardCount: 2,
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            holeCards: [
+              { r: '2', s: 'c' },
+              { r: '3', s: 'd' },
+            ],
+            holeCardCount: 2,
+          }),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[1]?.oppHoleCards).toHaveLength(2);
+    expect(adapted.seatStatesBySeatIndex[1]?.showOppBackcards).toBe(false);
+  });
+
+  it('keeps opponent cards hidden on fold-win completion', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        handEndKind: 'FOLD_WIN',
+        street: 'RIVER',
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            holeCards: [
+              { r: 'A', s: 's' },
+              { r: 'K', s: 'h' },
+            ],
+            holeCardCount: 2,
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            hasFolded: true,
+            holeCardCount: 2,
+          }),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[1]?.oppHoleCards).toBeNull();
+    expect(adapted.seatStatesBySeatIndex[1]?.showOppBackcards).toBe(true);
+  });
+
+  it('clears revealed opponent cards on next hand', () => {
+    const completed = adaptPlayerGameState(
+      baseState({
+        handComplete: true,
+        handEndKind: 'SHOWDOWN',
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            holeCards: [
+              { r: 'A', s: 's' },
+              { r: 'K', s: 'h' },
+            ],
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            holeCards: [
+              { r: '2', s: 'c' },
+              { r: '3', s: 'd' },
+            ],
+          }),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(completed.seatStatesBySeatIndex[1]?.oppHoleCards).toHaveLength(2);
+
+    const nextHand = adaptPlayerGameState(
+      baseState({
+        handId: 'hand-2',
+        handComplete: false,
+        handEndKind: undefined,
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            holeCards: [
+              { r: 'Q', s: 's' },
+              { r: 'J', s: 'h' },
+            ],
+            holeCardCount: 2,
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', { holeCardCount: 2 }),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(nextHand.seatStatesBySeatIndex[1]?.oppHoleCards).toBeNull();
+    expect(nextHand.seatStatesBySeatIndex[1]?.showOppBackcards).toBe(true);
+  });
+
   it('places viewer at layout seat 0', () => {
     const adapted = adaptPlayerGameState(baseState(), 'Hero', roomRoster);
     expect(adapted.playersBySeatIndex[0]?.name).toBe('Hero');
     expect(adapted.layout[0]?.hero).toBe(true);
+  });
+
+  it('uses viewerSeatIndex 1 for bottom hero even when seat 0 has hole cards', () => {
+    const state = baseState({
+      viewerSeatIndex: 1,
+      seats: [
+        occupiedSeat(0, 'p-villain', 'Villain', {
+          holeCards: [
+            { r: '2', s: 'c' },
+            { r: '3', s: 'd' },
+          ],
+          holeCardCount: 2,
+        }),
+        occupiedSeat(1, 'p-hero', 'Hero', {
+          holeCards: [
+            { r: 'A', s: 's' },
+            { r: 'K', s: 'h' },
+          ],
+          holeCardCount: 2,
+        }),
+        ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+      ],
+    });
+    expect(resolveViewerServerSeatIndex(state, 'Hero')).toBe(1);
+    const adapted = adaptPlayerGameState(state, 'Hero', roomRoster);
+    expect(adapted.playersBySeatIndex[0]?.name).toBe('Hero');
+    expect(adapted.layout[0]?.hero).toBe(true);
+  });
+
+  it('showdown reveal does not change hero when both seats have hole cards', () => {
+    const state = baseState({
+      viewerSeatIndex: 1,
+      handComplete: true,
+      handEndKind: 'SHOWDOWN',
+      street: 'SHOWDOWN',
+      seats: [
+        occupiedSeat(0, 'p-villain', 'Villain', {
+          holeCards: [
+            { r: '2', s: 'c' },
+            { r: '3', s: 'd' },
+          ],
+          holeCardCount: 2,
+        }),
+        occupiedSeat(1, 'p-hero', 'Hero', {
+          holeCards: [
+            { r: 'A', s: 's' },
+            { r: 'K', s: 'h' },
+          ],
+          holeCardCount: 2,
+        }),
+        ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+      ],
+    });
+    const asHero = adaptPlayerGameState(state, 'Hero', roomRoster);
+    const asVillain = adaptPlayerGameState(
+      { ...state, viewerSeatIndex: 0 },
+      'Villain',
+      roomRoster,
+    );
+    expect(asHero.playersBySeatIndex[0]?.name).toBe('Hero');
+    expect(asVillain.playersBySeatIndex[0]?.name).toBe('Villain');
+    expect(asHero.seatStatesBySeatIndex[1]?.oppHoleCards).toHaveLength(2);
+    expect(asVillain.seatStatesBySeatIndex[1]?.oppHoleCards).toHaveLength(2);
+  });
+
+  it('does not infer viewer from holeCards when viewerSeatIndex is set', () => {
+    const state = baseState({
+      viewerSeatIndex: 1,
+      seats: [
+        occupiedSeat(0, 'p-villain', 'Villain', {
+          holeCards: [
+            { r: '2', s: 'c' },
+            { r: '3', s: 'd' },
+          ],
+          holeCardCount: 2,
+        }),
+        occupiedSeat(1, 'p-hero', 'Hero', { holeCardCount: 2 }),
+        ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+      ],
+    });
+    expect(resolveViewerServerSeatIndex(state, null)).toBe(1);
   });
 
   it('orders occupied seats with viewer first', () => {
@@ -229,6 +418,40 @@ describe('gameStateAdapter', () => {
     const adapted = adaptPlayerGameState(baseState(), 'Hero', roomRoster);
     expect(adapted.phase).toBe('hand');
     expect(adapted.boardCards.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('countSeatsWithChips ignores busted seats', () => {
+    expect(
+      countSeatsWithChips(
+        baseState({
+          seats: [
+            occupiedSeat(0, 'p-hero', 'Hero', { stack: 150 }),
+            occupiedSeat(1, 'p-villain', 'Villain', { stack: 0, isSittingOut: true }),
+            ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+          ],
+        }),
+      ),
+    ).toBe(1);
+  });
+
+  it('renders zero-stack player as sitout', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', { stack: 150 }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            stack: 0,
+            isSittingOut: true,
+            holeCardCount: 0,
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('sitout');
+    expect(adapted.seatStatesBySeatIndex[1]?.showOppBackcards).toBe(false);
   });
 
   it('enables action bar when viewer is active and has availableActions', () => {

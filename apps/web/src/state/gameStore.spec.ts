@@ -25,6 +25,7 @@ describe('gameStore', () => {
       handId: null,
       handComplete: false,
       showdownReady: false,
+      viewerSeatIndex: 0,
     });
 
     const s = useGameStore.getState();
@@ -63,6 +64,7 @@ describe('gameStore', () => {
       handId: 'new-hand',
       handComplete: false,
       showdownReady: false,
+      viewerSeatIndex: 0,
     });
 
     expect(useGameStore.getState().handResult).toBeNull();

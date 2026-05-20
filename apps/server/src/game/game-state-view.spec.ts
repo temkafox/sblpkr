@@ -11,6 +11,7 @@ import { PlayerGameStateSchema, PublicGameStateSchema } from '@neonpoker/shared'
 import type { MutableInternalRoom } from '../room/room.types';
 import {
   containsPrivateEngineFields,
+  isFoldWinHand,
   toIdlePlayerGameState,
   toPlayerGameState,
   toPublicGameState,
@@ -75,11 +76,43 @@ describe('game-state-view (Phase 6C2)', () => {
     const view0 = PlayerGameStateSchema.parse(toPlayerGameState(state, 0, room));
     const view1 = PlayerGameStateSchema.parse(toPlayerGameState(state, 1, room));
 
+    expect(view0.viewerSeatIndex).toBe(0);
+    expect(view1.viewerSeatIndex).toBe(1);
     expect(view0.seats[0]!.holeCards).toHaveLength(2);
     expect(view0.seats[1]!.holeCards).toBeNull();
     expect(view1.seats[1]!.holeCards).toHaveLength(2);
     expect(view1.seats[0]!.holeCards).toBeNull();
     expect(containsPrivateEngineFields(view0)).toBe(false);
+  });
+
+  it('at showdown both viewers see contestant cards but viewerSeatIndex differs', () => {
+    let state = huState();
+    const p0 = state.playersById.p0!;
+    const p1 = state.playersById.p1!;
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+        street: 'SHOWDOWN',
+      }),
+      playersById: Object.freeze({
+        p0: Object.freeze({ ...p0, hasFolded: false }),
+        p1: Object.freeze({ ...p1, hasFolded: false }),
+      }),
+    });
+
+    const room = sampleRoom();
+    const view0 = PlayerGameStateSchema.parse(toPlayerGameState(state, 0, room));
+    const view1 = PlayerGameStateSchema.parse(toPlayerGameState(state, 1, room));
+
+    expect(view0.viewerSeatIndex).toBe(0);
+    expect(view1.viewerSeatIndex).toBe(1);
+    expect(view0.seats[0]!.holeCards).toHaveLength(2);
+    expect(view0.seats[1]!.holeCards).toHaveLength(2);
+    expect(view1.seats[0]!.holeCards).toHaveLength(2);
+    expect(view1.seats[1]!.holeCards).toHaveLength(2);
   });
 
   it('never includes deck in mapped payloads', () => {
@@ -107,6 +140,72 @@ describe('game-state-view (Phase 6C2)', () => {
     const view = toPlayerGameState(state, seat, sampleRoom());
     expect(view.street).toBe('PRE-FLOP');
     expect(view.pot.total).toBeGreaterThan(0);
+  });
+
+  it('reveals showdown contestant hole cards after hand completes', () => {
+    let state = huState();
+    const p0 = state.playersById.p0!;
+    const p1 = state.playersById.p1!;
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+        street: 'SHOWDOWN',
+      }),
+      playersById: Object.freeze({
+        p0: Object.freeze({ ...p0, hasFolded: false }),
+        p1: Object.freeze({ ...p1, hasFolded: false }),
+      }),
+    });
+
+    const room = sampleRoom();
+    const view0 = PlayerGameStateSchema.parse(toPlayerGameState(state, 0, room));
+    const view1 = PlayerGameStateSchema.parse(toPlayerGameState(state, 1, room));
+
+    expect(view0.handEndKind).toBe('SHOWDOWN');
+    expect(view0.seats[0]!.holeCards).toHaveLength(2);
+    expect(view0.seats[1]!.holeCards).toHaveLength(2);
+    expect(view1.seats[0]!.holeCards).toHaveLength(2);
+    expect(view1.seats[1]!.holeCards).toHaveLength(2);
+    expect(containsPrivateEngineFields(view0)).toBe(false);
+    expect(JSON.stringify(view0).includes('deck')).toBe(false);
+  });
+
+  it('does not reveal folded or opponent cards on fold-win completion', () => {
+    let state = huState();
+    const winner = state.playersById.p0!;
+    const folder = state.playersById.p1!;
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+        street: 'RIVER',
+      }),
+      playersById: Object.freeze({
+        p0: Object.freeze({ ...winner, hasFolded: false }),
+        p1: Object.freeze({ ...folder, hasFolded: true }),
+      }),
+    });
+
+    expect(isFoldWinHand(state)).toBe(true);
+
+    const view0 = toPlayerGameState(state, 0, sampleRoom());
+    expect(view0.handEndKind).toBe('FOLD_WIN');
+    expect(view0.seats[0]!.holeCards).toHaveLength(2);
+    expect(view0.seats[1]!.holeCards).toBeNull();
+    expect(view0.seats[1]!.holeCardCount).toBe(2);
+  });
+
+  it('does not reveal hole cards while hand is still in progress', () => {
+    const state = huState();
+    const view = toPlayerGameState(state, 0, sampleRoom());
+    expect(view.handEndKind).toBeNull();
+    expect(view.seats[1]!.holeCards).toBeNull();
+    expect(view.seats[1]!.holeCardCount).toBe(2);
   });
 
   it('toIdlePlayerGameState clears active-hand fields', () => {

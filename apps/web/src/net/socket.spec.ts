@@ -38,6 +38,7 @@ const roomState: RoomStatePayload = {
 const gameState: PlayerGameState = {
   tableId: roomState.roomId,
   maxSeats: 2,
+  viewerSeatIndex: 0,
   street: null,
   boardCards: [],
   pot: { total: 0, sidePots: [] },

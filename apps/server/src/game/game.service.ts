@@ -16,6 +16,8 @@ import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
 import { buildHandResultPayload } from './hand-result';
 import {
+  applySeatEligibility,
+  countEligiblePlayers,
   foldDepartedPlayers,
   syncTableToRoom,
 } from '../table/table-roster-sync';
@@ -65,10 +67,19 @@ export class GameService {
     }
 
     const existing = this.tableService.getTableState(roomId);
-    const base =
+    let base =
       existing != null
         ? syncTableToRoom(room, existing)
         : this.tableService.createTableForRoom(room);
+    base = applySeatEligibility(base);
+
+    if (countEligiblePlayers(base) < 2) {
+      this.tableService.setTableState(roomId, base);
+      throw new GameOrchestrationError(
+        'NOT_ENOUGH_PLAYERS',
+        'Not enough players with chips',
+      );
+    }
 
     if (base.hand != null && !base.hand.isComplete) {
       throw new GameOrchestrationError(

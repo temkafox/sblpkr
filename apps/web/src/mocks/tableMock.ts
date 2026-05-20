@@ -74,6 +74,8 @@ export interface SeatStateMock {
   amount?: number | '';
   /** When false, opponent backcards are hidden (server has no holeCardCount). */
   showOppBackcards?: boolean;
+  /** Face-up opponent hole cards after showdown (layout seat only). */
+  oppHoleCards?: readonly CardModel[] | null;
 }
 
 export type PlayerRing = 'cyan' | 'pink' | 'magenta' | 'violet' | 'green' | 'amber';
