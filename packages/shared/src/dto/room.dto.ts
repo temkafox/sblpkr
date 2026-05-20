@@ -86,3 +86,21 @@ export const LeaveRoomPayloadSchema = z.object({
 });
 
 export type LeaveRoomPayload = z.infer<typeof LeaveRoomPayloadSchema>;
+
+const RoomPlayerSchema = z.object({
+  playerId: z.string().min(1),
+  nickname: z.string().min(1),
+  seatIndex: z.number().int().nonnegative().nullable(),
+});
+
+/** Wire snapshot broadcast on `SERVER_ROOM_STATE` (Phase 6B). */
+
+export const RoomStateSchema = z.object({
+  roomId: z.string().min(1),
+  code: RoomCodeSchema,
+  maxSeats: z.number().int().positive(),
+  players: z.array(RoomPlayerSchema),
+  status: z.enum(['waiting', 'playing', 'closed']),
+});
+
+export type RoomStatePayload = z.infer<typeof RoomStateSchema>;

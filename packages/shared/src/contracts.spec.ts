@@ -5,6 +5,7 @@ import {
   ClientHelloSchema,
   CreateRoomRequestSchema,
   JoinRoomPayloadSchema,
+  RoomStateSchema,
   PlayerActionPayloadSchema,
   PROTOCOL_VERSION,
   RegisterNicknamePayloadSchema,
@@ -145,5 +146,18 @@ describe('REST room schemas (Phase 6A)', () => {
       RoomIdOrCodeParamSchema.parse('11111111-1111-4111-8111-111111111111'),
     ).toBe('11111111-1111-4111-8111-111111111111');
     expect(RoomIdOrCodeParamSchema.parse('ROOM01')).toBe('ROOM01');
+  });
+
+  it('RoomStateSchema validates SERVER_ROOM_STATE payload', () => {
+    const parsed = RoomStateSchema.parse({
+      roomId: '11111111-1111-4111-8111-111111111111',
+      code: 'ABC123',
+      maxSeats: 9,
+      status: 'waiting',
+      players: [
+        { playerId: 'p1', nickname: 'Neo', seatIndex: null },
+      ],
+    });
+    expect(parsed.players).toHaveLength(1);
   });
 });
