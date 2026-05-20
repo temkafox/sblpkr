@@ -1,0 +1,35 @@
+.np-table-wrap {
+  position: absolute;
+  left: 170px;
+  top: 115px;
+  width: 1380px;
+  height: 690px;
+  z-index: 5;
+}
+
+.np-table-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/assets/table.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.55));
+}
+
+.np-felt-mark {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-size: 44px;
+  letter-spacing: 0.55em;
+  font-weight: 700;
+  color: rgba(139, 92, 255, 0.035);
+  text-shadow: 0 0 30px rgba(139, 92, 255, 0.04);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}

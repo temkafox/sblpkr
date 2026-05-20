@@ -2,6 +2,7 @@ import { Background } from './components/layout/Background';
 import { Logo } from './components/layout/Logo';
 import { Stage } from './components/layout/Stage';
 import { StageScaler } from './components/layout/StageScaler';
+import { TablePage } from './pages/TablePage/TablePage';
 
 export function App() {
   return (
@@ -9,9 +10,7 @@ export function App() {
       <Stage>
         <Background />
         <Logo />
-        <div className="phase1a-placeholder">
-          <div>Phase 1A UI foundation ready</div>
-        </div>
+        <TablePage />
       </Stage>
     </StageScaler>
   );

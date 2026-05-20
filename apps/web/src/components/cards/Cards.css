@@ -1,0 +1,152 @@
+.np-board {
+  position: absolute;
+  left: 620px;
+  top: 410px;
+  width: 500px;
+  height: 145px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 8;
+}
+
+.np-board-slot {
+  width: 88px;
+  height: 124px;
+  display: grid;
+  place-items: center;
+}
+
+.np-board-slot .np-card-back:not(.np-card-back--mini) {
+  width: 88px;
+  height: 124px;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 255, 0.45),
+    0 0 14px rgba(139, 92, 255, 0.4),
+    0 10px 22px rgba(0, 0, 0, 0.65);
+  animation: np-card-deal 0.35s ease-out backwards;
+}
+
+@keyframes np-card-deal {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.np-card-face {
+  width: 88px;
+  height: 124px;
+  background: linear-gradient(180deg, #fff 0%, #f0eef5 100%);
+  border-radius: 8px;
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 0 0 2px rgba(0, 0, 0, 0.4),
+    0 0 18px rgba(139, 92, 255, 0.35),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  color: #111;
+  font-family: var(--font-display);
+  user-select: none;
+}
+
+.np-card-face.np-card-face--red {
+  color: #d40d3a;
+}
+
+.np-card-face .np-card-rank {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.np-card-face .np-card-suit {
+  font-size: 22px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.np-card-face .np-card-suit-big {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  font-size: 44px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.np-card-face.np-card-face--flipped {
+  animation: np-flip-in 0.35s ease-out backwards;
+}
+
+@keyframes np-flip-in {
+  from {
+    transform: rotateY(90deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+.np-card-back {
+  width: 88px;
+  height: 124px;
+  background-image: url('/assets/backcard.png');
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 255, 0.4),
+    0 0 14px rgba(139, 92, 255, 0.4),
+    0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.np-card-back.np-card-back--mini {
+  width: 50px;
+  height: 70px;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 255, 0.7),
+    0 0 12px rgba(139, 92, 255, 0.6),
+    0 6px 14px rgba(0, 0, 0, 0.7);
+}
+
+.np-hero-holes {
+  position: absolute;
+  left: 760px;
+  top: 568px;
+  width: 200px;
+  height: 130px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.np-hero-holes .np-card-face {
+  transform: rotate(-6deg) translateY(2px);
+  width: 84px;
+  height: 118px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 0 0 2px rgba(0, 0, 0, 0.5),
+    0 0 22px rgba(34, 211, 255, 0.6),
+    0 12px 24px rgba(0, 0, 0, 0.6);
+}
+
+.np-hero-holes .np-card-face:nth-child(2) {
+  transform: rotate(6deg) translateY(2px);
+}

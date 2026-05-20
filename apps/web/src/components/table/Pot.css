@@ -1,0 +1,57 @@
+.np-pot {
+  position: absolute;
+  left: 810px;
+  top: 300px;
+  width: 300px;
+  height: 95px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 8;
+}
+
+.np-pot .np-pot-lbl {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--text-lo);
+  text-transform: uppercase;
+}
+
+.np-pot .np-pot-amt {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fff, #c4b9ff 70%, #8b5cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 22px rgba(139, 92, 255, 0.55);
+  line-height: 1;
+}
+
+.np-pot .np-pot-chip-row {
+  display: flex;
+  align-items: end;
+  margin-top: 4px;
+}
+
+.np-pot .np-pot-chip-row img {
+  width: 38px;
+  height: auto;
+  margin-left: -14px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
+}
+
+.np-pot .np-pot-chip-row img:first-child {
+  margin-left: 0;
+}
+
+.np-pot .np-pot-chip-row img:nth-child(2) {
+  transform: translateY(-3px);
+}
+
+.np-pot .np-pot-chip-row img:nth-child(3) {
+  transform: translateY(-6px);
+}

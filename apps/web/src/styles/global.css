@@ -159,34 +159,19 @@ body {
   color: var(--text-lo);
 }
 
-/* ============================================================
-   Phase 1A placeholder (not final UI)
-   ============================================================ */
-
-.phase1a-placeholder {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s-4) var(--s-6);
-  border-radius: var(--r-md);
-  border: var(--border-hairline);
-  background: rgba(10, 6, 26, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--glow-cyan);
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-.phase1a-placeholder > div {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--text-md);
-  text-align: center;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 255, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 255, 0.5);
 }

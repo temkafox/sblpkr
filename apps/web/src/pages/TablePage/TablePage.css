@@ -1,0 +1,9 @@
+.table-page {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.table-page > * {
+  pointer-events: auto;
+}
