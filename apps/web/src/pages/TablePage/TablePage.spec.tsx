@@ -12,6 +12,7 @@ import { useSessionStore } from '../../state/sessionStore';
 
 vi.mock('../../net/socket', () => ({
   requestGameState: vi.fn(),
+  requestHandHistory: vi.fn(),
   startHand: vi.fn(),
   rebuy: vi.fn(),
   sendPlayerAction: vi.fn(),
@@ -139,9 +140,10 @@ describe('TablePage live room', () => {
     });
   });
 
-  it('requests game state on mount', () => {
+  it('requests game state and hand history on mount', () => {
     renderTable();
     expect(socket.requestGameState).toHaveBeenCalledWith(roomId);
+    expect(socket.requestHandHistory).toHaveBeenCalledWith(roomId);
   });
 
   it('pre-hand with one player hides board, badges, and Start Hand', () => {

@@ -4,6 +4,7 @@ import {
   ChatMessagePayloadSchema,
   ClientHelloSchema,
   CreateRoomRequestSchema,
+  HandHistoryPayloadSchema,
   HandResultPayloadSchema,
   JoinRoomPayloadSchema,
   PublicSeatActionSchema,
@@ -88,6 +89,41 @@ describe('PlayerActionPayloadSchema', () => {
       PlayerActionPayloadSchema.parse({
         roomId: 'room-1',
         action: { kind: 'donate' },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('HandHistoryPayloadSchema', () => {
+  it('parses grouped street history without private fields', () => {
+    const parsed = HandHistoryPayloadSchema.parse({
+      roomId: 'room-1',
+      handId: 'hand-1',
+      handNumber: 1,
+      streets: [
+        {
+          street: 'PRE-FLOP',
+          entries: [
+            {
+              seq: 0,
+              street: 'PRE-FLOP',
+              text: 'Alpha posts small blind $1',
+              nickname: 'Alpha',
+              actionKind: 'post_sb',
+              amount: 1,
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.streets[0]?.entries[0]?.amount).toBe(1);
+    expect(() =>
+      HandHistoryPayloadSchema.parse({
+        roomId: 'room-1',
+        handId: 'hand-1',
+        handNumber: 1,
+        streets: [],
+        deck: [],
       }),
     ).toThrow();
   });

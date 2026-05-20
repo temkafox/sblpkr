@@ -5,19 +5,23 @@ import {
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_START_HAND,
   SERVER_ERROR,
   SERVER_GAME_STATE,
+  SERVER_HAND_HISTORY,
   SERVER_HAND_RESULT,
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
 import type {
+  HandHistoryPayload,
   HandResultPayload,
   PlayerActionIntent,
   PlayerGameState,
   RoomStatePayload,
   ServerErrorPayload,
 } from '@neonpoker/shared';
+import { HandHistoryPayloadSchema } from '@neonpoker/shared';
 import { io, type Socket } from 'socket.io-client';
 
 import {
@@ -70,6 +74,7 @@ function attachGlobalListeners(client: Socket): void {
       )
     ) {
       useGameStore.getState().clearGameState();
+      useGameStore.getState().clearHandHistory();
     }
     useGameStore.getState().setGameError(null);
     useGameStore.getState().setGameLoading(false);
@@ -88,6 +93,14 @@ function attachGlobalListeners(client: Socket): void {
     for (const listener of gameStateListeners) {
       listener(payload);
     }
+  });
+
+  client.on(SERVER_HAND_HISTORY, (payload: HandHistoryPayload) => {
+    const parsed = HandHistoryPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      return;
+    }
+    useGameStore.getState().setHandHistory(parsed.data);
   });
 
   client.on(SERVER_HAND_RESULT, (payload: HandResultPayload) => {
@@ -170,6 +183,7 @@ export function disconnectSocket(): void {
   gameStateListeners.clear();
   handResultListeners.clear();
   useGameStore.getState().clearHandResult();
+  useGameStore.getState().clearHandHistory();
   setConnectionStatus('idle');
 }
 
@@ -184,6 +198,7 @@ export function leaveRoom(roomId?: string): void {
     socket?.emit(CLIENT_LEAVE_ROOM, {});
   }
   useGameStore.getState().clearHandResult();
+  useGameStore.getState().clearHandHistory();
 }
 
 export function joinRoom(roomId: string): Promise<RoomStatePayload> {
@@ -233,6 +248,10 @@ export function joinRoom(roomId: string): Promise<RoomStatePayload> {
 export function requestGameState(roomId: string): void {
   useGameStore.getState().setGameLoading(true);
   socket?.emit(CLIENT_REQUEST_GAME_STATE, { roomId });
+}
+
+export function requestHandHistory(roomId: string): void {
+  socket?.emit(CLIENT_REQUEST_HAND_HISTORY, { roomId });
 }
 
 export function startHand(roomId: string): void {

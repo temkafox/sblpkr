@@ -81,6 +81,30 @@ describe('gameStore', () => {
     expect(useGameStore.getState().handResult).toBeNull();
   });
 
+  it('setHandHistory maps payload to sidebar streets', () => {
+    useGameStore.getState().setHandHistory({
+      roomId: 't1',
+      handId: 'h1',
+      handNumber: 1,
+      streets: [
+        {
+          street: 'PRE-FLOP',
+          entries: [
+            {
+              seq: 0,
+              street: 'PRE-FLOP',
+              text: 'Hero checks',
+              nickname: 'Hero',
+              nameColor: 'n-c',
+              actionKind: 'check',
+            },
+          ],
+        },
+      ],
+    });
+    expect(useGameStore.getState().handHistory[0]?.rows[0]?.act).toBe('checks');
+  });
+
   it('clearGameState resets all fields', () => {
     useGameStore.getState().setHandResult({
       handId: 'h1',
@@ -92,5 +116,6 @@ describe('gameStore', () => {
     const s = useGameStore.getState();
     expect(s.gameState).toBeNull();
     expect(s.handResult).toBeNull();
+    expect(s.handHistory).toEqual([]);
   });
 });

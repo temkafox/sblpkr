@@ -89,6 +89,14 @@
   min-height: 0;
 }
 
+.np-hh-empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text-lo);
+  letter-spacing: 0.04em;
+}
+
 .np-hh-scroll {
   height: 100%;
   overflow-y: auto;

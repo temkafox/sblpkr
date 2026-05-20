@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { CoreGameState } from '@neonpoker/poker-core';
 import {
   SERVER_GAME_STATE,
+  SERVER_HAND_HISTORY,
   SERVER_HAND_RESULT,
 } from '@neonpoker/shared';
 import type { HandResultPayload } from '@neonpoker/shared';
@@ -10,6 +11,7 @@ import type { Server, Socket } from 'socket.io';
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
 import { extractHandResult } from './hand-result';
+import { HandHistoryService } from './hand-history.service';
 import { toIdlePlayerGameState, toPlayerGameState } from './game-state-view';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class GameBroadcastService {
   constructor(
     private readonly roomService: RoomService,
     private readonly tableService: TableService,
+    private readonly handHistory: HandHistoryService,
   ) {}
 
   /** Per-viewer idle snapshots (no active hand UI) — used after rebuy. */
@@ -94,12 +97,23 @@ export class GameBroadcastService {
     return extractHandResult(state, cached);
   }
 
+  emitHandHistoryToRoom(server: Server, roomId: string): void {
+    server
+      .to(roomId)
+      .emit(SERVER_HAND_HISTORY, this.handHistory.buildPayload(roomId));
+  }
+
+  emitHandHistoryToClient(client: Socket, roomId: string): void {
+    client.emit(SERVER_HAND_HISTORY, this.handHistory.buildPayload(roomId));
+  }
+
   emitGameUpdateToRoom(
     server: Server,
     roomId: string,
     state: CoreGameState,
   ): void {
     this.emitGameStateToRoom(server, roomId, state);
+    this.emitHandHistoryToRoom(server, roomId);
     if (state.hand?.isComplete) {
       this.emitHandResultToRoom(server, roomId, state);
     }

@@ -26,6 +26,7 @@ import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
 import {
   rebuy,
   requestGameState,
+  requestHandHistory,
   sendPlayerAction,
   startHand,
 } from '../../net/socket';
@@ -39,6 +40,7 @@ export function TablePage() {
   const connectionStatus = useSessionStore((s) => s.connectionStatus);
   const gameState = useGameStore((s) => s.gameState);
   const handResult = useGameStore((s) => s.handResult);
+  const handHistory = useGameStore((s) => s.handHistory);
   const isGameLoading = useGameStore((s) => s.isGameLoading);
   const isSubmittingAction = useGameStore((s) => s.isSubmittingAction);
   const gameError = useGameStore((s) => s.gameError);
@@ -85,6 +87,7 @@ export function TablePage() {
       useGameStore.getState().setGameLoading(true);
     }
     requestGameState(roomId);
+    requestHandHistory(roomId);
   }, [roomId]);
 
   const tableView = useMemo(() => {
@@ -321,7 +324,7 @@ export function TablePage() {
         />
       ) : null}
       <RightSidebar
-        handHistory={tableView.handHistory}
+        handHistory={handHistory}
         chatMessages={tableView.chatMessages}
         gameInfo={tableView.gameInfo}
       />

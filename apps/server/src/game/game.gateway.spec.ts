@@ -24,6 +24,7 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
 import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameBroadcastService } from './game-broadcast';
+import { HandHistoryService } from './hand-history.service';
 import { GameService } from './game.service';
 import { containsPrivateEngineFields } from './game-state-view';
 import { RoomGateway } from '../room/room.gateway';
@@ -106,7 +107,12 @@ describe('Game gateway (Phase 6C2)', () => {
       tableService,
       rng: () => createSeededRandom(`6c2-gw-${seq}`),
     });
-    const gameBroadcast = new GameBroadcastService(roomService, tableService);
+    const handHistory = new HandHistoryService();
+    const gameBroadcast = new GameBroadcastService(
+      roomService,
+      tableService,
+      handHistory,
+    );
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
 
     httpServer = createServer();

@@ -14,7 +14,9 @@ import {
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_START_HAND,
+  RequestHandHistoryPayloadSchema,
   PlayerActionPayloadSchema,
   RebuyPayloadSchema,
   RequestGameStatePayloadSchema,
@@ -83,6 +85,7 @@ export class RoomGateway implements OnGatewayDisconnect {
     await client.join(result.roomId);
     this.broadcastRoomState(result.roomId);
     this.broadcastIdleTableStateIfNoHand(result.roomId);
+    this.gameBroadcast.emitHandHistoryToClient(client, result.roomId);
   }
 
   @SubscribeMessage(CLIENT_LEAVE_ROOM)
@@ -133,10 +136,40 @@ export class RoomGateway implements OnGatewayDisconnect {
       const state = this.gameService.rebuy(roomId, seatIndex);
       this.broadcastRoomState(roomId);
       this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
+      this.gameBroadcast.emitHandHistoryToRoom(this.server, roomId);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
     }
+  }
+
+  @SubscribeMessage(CLIENT_REQUEST_HAND_HISTORY)
+  handleRequestHandHistory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): void {
+    const parsed = RequestHandHistoryPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      this.emitError(
+        client,
+        'INVALID_PAYLOAD',
+        parsed.error.issues[0]?.message ?? 'Invalid hand history payload',
+      );
+      return;
+    }
+
+    const roomId = this.resolveRoomId(parsed.data.roomId);
+    if (roomId == null) {
+      this.emitError(client, 'ROOM_NOT_FOUND', 'Room not found');
+      return;
+    }
+
+    if (!this.roomService.isSocketInRoom(client.id, roomId)) {
+      this.emitError(client, 'NOT_JOINED', 'Join the room before requesting history');
+      return;
+    }
+
+    this.gameBroadcast.emitHandHistoryToClient(client, roomId);
   }
 
   @SubscribeMessage(CLIENT_START_HAND)
@@ -250,6 +283,7 @@ export class RoomGateway implements OnGatewayDisconnect {
           : toPlayerGameState(state, seatIndex, room);
       client.emit(SERVER_GAME_STATE, view);
       this.gameBroadcast.emitHandResultToClient(client, roomId, state);
+      this.gameBroadcast.emitHandHistoryToClient(client, roomId);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);

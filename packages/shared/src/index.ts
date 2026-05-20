@@ -18,6 +18,7 @@ export * from './events/socket-events';
 
 export * from './dto/room.dto';
 export * from './dto/game.dto';
+export * from './dto/hand-history.dto';
 export * from './dto/action.dto';
 export * from './dto/chat.dto';
 export * from './dto/error.dto';

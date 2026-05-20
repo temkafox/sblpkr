@@ -2,13 +2,16 @@ import {
   CLIENT_PLAYER_ACTION,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_START_HAND,
   SERVER_ERROR,
   SERVER_GAME_STATE,
+  SERVER_HAND_HISTORY,
   SERVER_HAND_RESULT,
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
 import type {
+  HandHistoryPayload,
   HandResultPayload,
   PlayerGameState,
   RoomStatePayload,
@@ -24,6 +27,7 @@ import {
   joinRoom,
   rebuy,
   requestGameState,
+  requestHandHistory,
   resetSocketClientForTests,
   sendPlayerAction,
   startHand,
@@ -280,6 +284,38 @@ describe('socket client', () => {
     expect(useGameStore.getState().gameState).toBeNull();
   });
 
+  it('SERVER_HAND_HISTORY updates gameStore', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    const history: HandHistoryPayload = {
+      roomId: roomState.roomId,
+      handId: 'hand-1',
+      handNumber: 1,
+      streets: [
+        {
+          street: 'PRE-FLOP',
+          entries: [
+            {
+              seq: 0,
+              street: 'PRE-FLOP',
+              text: 'Hero calls $2',
+              nickname: 'Hero',
+              actionKind: 'call',
+              amount: 2,
+            },
+          ],
+        },
+      ],
+    };
+
+    fire(SERVER_HAND_HISTORY, history);
+
+    expect(useGameStore.getState().handHistory[0]?.rows[0]?.act).toBe('calls $2');
+  });
+
   it('SERVER_HAND_RESULT updates gameStore', async () => {
     const connectPromise = connectSocket();
     mockSocket.connected = true;
@@ -306,6 +342,19 @@ describe('socket client', () => {
     fire(SERVER_HAND_RESULT, { ...handResult, handId: 'hand-stale' });
 
     expect(useGameStore.getState().handResult).toBeNull();
+  });
+
+  it('requestHandHistory emits CLIENT_REQUEST_HAND_HISTORY', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    requestHandHistory(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_REQUEST_HAND_HISTORY, {
+      roomId: roomState.roomId,
+    });
   });
 
   it('requestGameState emits CLIENT_REQUEST_GAME_STATE', async () => {

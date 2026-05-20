@@ -13,7 +13,7 @@ export type HandHistoryStreet = {
 
 /** Bundle for replay / persistence boundaries (expand in later phases). */
 
-export type HandHistoryEntry = {
+export type HandHistoryArchive = {
   readonly handId: string;
   readonly handNumber: number;
   readonly streets: readonly HandHistoryStreet[];

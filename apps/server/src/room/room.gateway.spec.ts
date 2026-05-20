@@ -14,6 +14,7 @@ import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
 import { GameBroadcastService } from '../game/game-broadcast';
+import { HandHistoryService } from '../game/hand-history.service';
 import { GameService } from '../game/game.service';
 import { TableService } from '../table/table.service';
 import { RoomGateway } from './room.gateway';
@@ -82,7 +83,12 @@ describe('RoomGateway (Socket.IO)', () => {
 
     const tableService = new TableService();
     const gameService = GameService.forTest({ roomService, tableService });
-    const gameBroadcast = new GameBroadcastService(roomService, tableService);
+    const handHistory = new HandHistoryService();
+    const gameBroadcast = new GameBroadcastService(
+      roomService,
+      tableService,
+      handHistory,
+    );
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
     httpServer = createServer();
     io = new Server(httpServer, { cors: { origin: true } });

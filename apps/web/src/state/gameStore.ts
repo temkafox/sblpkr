@@ -1,5 +1,12 @@
-import type { HandResultPayload, PlayerGameState } from '@neonpoker/shared';
+import type {
+  HandHistoryPayload,
+  HandResultPayload,
+  PlayerGameState,
+} from '@neonpoker/shared';
 import { create } from 'zustand';
+
+import { handHistoryStreetsFromPayload } from '../lib/handHistoryAdapter';
+import type { HandHistoryStreet } from '../mocks/tableMock';
 
 function shouldClearHandResultOnGameState(
   previous: PlayerGameState | null,
@@ -17,21 +24,25 @@ function shouldClearHandResultOnGameState(
 type GameState = {
   gameState: PlayerGameState | null;
   handResult: HandResultPayload | null;
+  handHistory: HandHistoryStreet[];
   isGameLoading: boolean;
   isSubmittingAction: boolean;
   gameError: string | null;
   setGameState: (state: PlayerGameState) => void;
   setHandResult: (result: HandResultPayload) => void;
+  setHandHistory: (payload: HandHistoryPayload) => void;
   setGameLoading: (loading: boolean) => void;
   setSubmittingAction: (submitting: boolean) => void;
   setGameError: (message: string | null) => void;
   clearHandResult: () => void;
+  clearHandHistory: () => void;
   clearGameState: () => void;
 };
 
 export const useGameStore = create<GameState>((set) => ({
   gameState: null,
   handResult: null,
+  handHistory: [],
   isGameLoading: false,
   isSubmittingAction: false,
   gameError: null,
@@ -46,15 +57,19 @@ export const useGameStore = create<GameState>((set) => ({
       gameError: null,
     })),
   setHandResult: (handResult) => set({ handResult }),
+  setHandHistory: (payload) =>
+    set({ handHistory: handHistoryStreetsFromPayload(payload) }),
   setGameLoading: (isGameLoading) => set({ isGameLoading }),
   setSubmittingAction: (isSubmittingAction) => set({ isSubmittingAction }),
   setGameError: (gameError) =>
     set({ gameError, isSubmittingAction: false }),
   clearHandResult: () => set({ handResult: null }),
+  clearHandHistory: () => set({ handHistory: [] }),
   clearGameState: () =>
     set({
       gameState: null,
       handResult: null,
+      handHistory: [],
       isGameLoading: false,
       isSubmittingAction: false,
       gameError: null,

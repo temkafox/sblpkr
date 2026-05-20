@@ -11,6 +11,8 @@ function nameColorClass(cls: HandHistoryRow['cls']) {
 }
 
 export function HandHistoryPanel({ streets }: HandHistoryPanelProps) {
+  const isEmpty = streets.length === 0;
+
   return (
     <div className="np-panel np-hand-history">
       <div className="np-panel-head">
@@ -19,6 +21,9 @@ export function HandHistoryPanel({ streets }: HandHistoryPanelProps) {
       </div>
       <div className="np-hh-body">
         <div className="np-hh-scroll">
+          {isEmpty ? (
+            <p className="np-hh-empty">No hand history yet.</p>
+          ) : null}
           {streets.map((street, si) => (
             <section key={si}>
               <div className="np-hh-street">{street.street}</div>

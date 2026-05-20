@@ -15,6 +15,7 @@ import { toCorePlayerAction } from './action-mapper';
 import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
+import { HandHistoryService } from './hand-history.service';
 import { buildHandResultPayload } from './hand-result';
 import {
   applySeatEligibility,
@@ -34,16 +35,19 @@ export class GameService {
   constructor(
     private readonly roomService: RoomService,
     private readonly tableService: TableService,
+    private readonly handHistory: HandHistoryService,
   ) {}
 
   static forTest(options?: {
     readonly roomService?: RoomService;
     readonly tableService?: TableService;
+    readonly handHistory?: HandHistoryService;
     readonly rng?: GameRngFactory;
   }): GameService {
     const tableService = options?.tableService ?? new TableService();
     const roomService = options?.roomService ?? RoomService.forTest();
-    const svc = new GameService(roomService, tableService);
+    const handHistory = options?.handHistory ?? new HandHistoryService();
+    const svc = new GameService(roomService, tableService, handHistory);
     if (options?.rng) {
       svc.createRng = options.rng;
     }
@@ -107,6 +111,7 @@ export class GameService {
 
     this.tableService.setTableState(roomId, started);
     this.tableService.clearHandResult(roomId);
+    this.handHistory.onHandStarted(room, started);
     return started;
   }
 
@@ -182,6 +187,7 @@ export class GameService {
     next = clearCompletedHandForWaiting(next);
     this.tableService.setTableState(roomId, next);
     this.tableService.clearHandResult(roomId);
+    this.handHistory.onRebuy(room, seatIndex, DEFAULT_REBUY_CHIPS);
     return next;
   }
 
@@ -191,6 +197,7 @@ export class GameService {
     action: PlayerActionIntent,
   ): CoreGameState {
     const coreAction = toCorePlayerAction(action);
+    const room = this.requireRoom(roomId);
     let state = this.getGameState(roomId);
 
     if (state.hand == null || state.hand.isComplete) {
@@ -200,9 +207,18 @@ export class GameService {
       );
     }
 
+    const before = state;
     state = applyAction(state, seatIndex, coreAction);
+    this.handHistory.onPlayerAction(room, state, seatIndex, action);
     const progressed = progressGameState(state);
     state = progressed.state;
+    this.handHistory.onProgress(
+      room,
+      before,
+      state,
+      progressed.showdownResult,
+      progressed.isFoldWin,
+    );
     if (progressed.showdownResult != null && state.hand?.handId != null) {
       this.tableService.setHandResult(
         roomId,
@@ -218,8 +234,17 @@ export class GameService {
   }
 
   progressAfterAction(roomId: string): CoreGameState {
-    const progressed = progressGameState(this.getGameState(roomId));
+    const room = this.requireRoom(roomId);
+    const before = this.getGameState(roomId);
+    const progressed = progressGameState(before);
     const state = progressed.state;
+    this.handHistory.onProgress(
+      room,
+      before,
+      state,
+      progressed.showdownResult,
+      progressed.isFoldWin,
+    );
     if (progressed.showdownResult != null && state.hand?.handId != null) {
       this.tableService.setHandResult(
         roomId,
@@ -244,6 +269,7 @@ export class GameService {
       return false;
     }
     this.tableService.deleteTable(roomId);
+    this.handHistory.clearRoom(roomId);
     return true;
   }
 
@@ -265,8 +291,16 @@ export class GameService {
     state = foldDepartedPlayers(state, room);
     state = syncTableToRoom(room, state);
 
+    const before = state;
     const progressed = progressGameState(state);
     state = progressed.state;
+    this.handHistory.onProgress(
+      room,
+      before,
+      state,
+      progressed.showdownResult,
+      progressed.isFoldWin,
+    );
     if (progressed.showdownResult != null && state.hand?.handId != null) {
       this.tableService.setHandResult(
         roomId,
