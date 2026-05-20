@@ -27,3 +27,45 @@ export class SeatNotFoundError extends PokerCoreError {
     this.name = 'SeatNotFoundError';
   }
 }
+
+export class InvalidActionError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidActionError';
+  }
+}
+
+export class OutOfTurnError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OutOfTurnError';
+  }
+}
+
+export class CannotCheckError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CannotCheckError';
+  }
+}
+
+export class CannotCallError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CannotCallError';
+  }
+}
+
+export class CannotRaiseError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CannotRaiseError';
+  }
+}
+
+export class InsufficientChipsError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InsufficientChipsError';
+  }
+}

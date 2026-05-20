@@ -19,7 +19,7 @@ export type TableState = {
   readonly dealerSeatIndex: SeatIndex;
   readonly smallBlindSeatIndex: SeatIndex;
   readonly bigBlindSeatIndex: SeatIndex;
-  readonly activeSeatIndex: SeatIndex;
+  readonly activeSeatIndex: SeatIndex | null;
   readonly seats: readonly Seat[];
 };
 

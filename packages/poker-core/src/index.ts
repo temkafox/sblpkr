@@ -29,8 +29,14 @@ export { createInitialGameState } from './domain/game-state';
 export type { CorePlayerAction } from './domain/player-action';
 
 export {
+  InvalidActionError,
   InvalidTableStateError,
+  CannotCallError,
+  CannotCheckError,
+  CannotRaiseError,
+  InsufficientChipsError,
   NotEnoughPlayersError,
+  OutOfTurnError,
   PokerCoreError,
   SeatNotFoundError,
 } from './engine/errors';
@@ -49,3 +55,14 @@ export {
 
 export { startHand } from './engine/start-hand';
 export type { StartHandOptions } from './engine/start-hand';
+
+export type { CoreAvailableActions } from './engine/available-actions';
+export { getAvailableActions } from './engine/available-actions';
+
+export { applyAction } from './engine/actions';
+
+export {
+  advanceTurnAfterAction,
+  isBettingRoundComplete,
+  needsToAct,
+} from './engine/betting-round';
