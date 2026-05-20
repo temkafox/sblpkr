@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Vite
+apps/web/.vite/
+
+# Nest
+apps/server/dist/
+
+# Misc
+*.local
+.cache/
