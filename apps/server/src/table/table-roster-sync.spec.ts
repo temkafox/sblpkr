@@ -27,11 +27,15 @@ function roomWithPlayers(count: number): MutableInternalRoom {
     const sid = `sock-${i}`;
     const nick = roomService.registerNickname(sid, {
       nickname: `Player_${i}`,
+      clientSessionId: `session-${i}`,
     });
     if (!nick.ok) {
       throw new Error(`register failed: ${nick.message}`);
     }
-    const joined = roomService.joinRoom(sid, { roomId: created.roomId });
+    const joined = roomService.joinRoom(sid, {
+      roomId: created.roomId,
+      clientSessionId: `session-${i}`,
+    });
     if (!joined.ok) {
       throw new Error(`join failed: ${joined.message}`);
     }

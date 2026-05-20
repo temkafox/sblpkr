@@ -8,10 +8,15 @@
   flex-direction: column;
   gap: 14px;
   z-index: 30;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .np-sidebar .np-panel.np-hand-history {
-  flex: 0 0 505px;
+  flex: 1 1 505px;
+  max-height: 505px;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

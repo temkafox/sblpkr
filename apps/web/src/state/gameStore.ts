@@ -25,6 +25,7 @@ type GameState = {
   gameState: PlayerGameState | null;
   handResult: HandResultPayload | null;
   handHistory: HandHistoryStreet[];
+  handHistoryRevision: number | null;
   isGameLoading: boolean;
   isSubmittingAction: boolean;
   gameError: string | null;
@@ -43,6 +44,7 @@ export const useGameStore = create<GameState>((set) => ({
   gameState: null,
   handResult: null,
   handHistory: [],
+  handHistoryRevision: null,
   isGameLoading: false,
   isSubmittingAction: false,
   gameError: null,
@@ -58,18 +60,31 @@ export const useGameStore = create<GameState>((set) => ({
     })),
   setHandResult: (handResult) => set({ handResult }),
   setHandHistory: (payload) =>
-    set({ handHistory: handHistoryStreetsFromPayload(payload) }),
+    set((prev) => {
+      if (
+        prev.handHistoryRevision != null &&
+        prev.handHistoryRevision === payload.revision
+      ) {
+        return prev;
+      }
+      return {
+        handHistory: handHistoryStreetsFromPayload(payload),
+        handHistoryRevision: payload.revision,
+      };
+    }),
   setGameLoading: (isGameLoading) => set({ isGameLoading }),
   setSubmittingAction: (isSubmittingAction) => set({ isSubmittingAction }),
   setGameError: (gameError) =>
     set({ gameError, isSubmittingAction: false }),
   clearHandResult: () => set({ handResult: null }),
-  clearHandHistory: () => set({ handHistory: [] }),
+  clearHandHistory: () =>
+    set({ handHistory: [], handHistoryRevision: null }),
   clearGameState: () =>
     set({
       gameState: null,
       handResult: null,
       handHistory: [],
+      handHistoryRevision: null,
       isGameLoading: false,
       isSubmittingAction: false,
       gameError: null,

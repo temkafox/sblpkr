@@ -12,8 +12,14 @@ function seatRoom(roomService: RoomService, count: number): string {
   const room = roomService.createRoom({ maxSeats: 6 });
   for (let i = 0; i < count; i++) {
     const sid = `sock-${i}`;
-    roomService.registerNickname(sid, { nickname: `Player_${i}` });
-    roomService.joinRoom(sid, { roomId: room.roomId });
+    roomService.registerNickname(sid, {
+      nickname: `Player_${i}`,
+      clientSessionId: `session-${i}`,
+    });
+    roomService.joinRoom(sid, {
+      roomId: room.roomId,
+      clientSessionId: `session-${i}`,
+    });
   }
   return room.roomId;
 }

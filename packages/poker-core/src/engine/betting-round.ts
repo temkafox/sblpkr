@@ -43,6 +43,23 @@ export function getNonFoldedSeatIndexes(state: CoreGameState): SeatIndex[] {
   return out;
 }
 
+/** Non-folded players who may still bet (chips > 0 and not all-in). */
+export function getActorsWhoCanBetSeatIndexes(state: CoreGameState): SeatIndex[] {
+  const out: SeatIndex[] = [];
+  for (const seat of getNonFoldedSeatIndexes(state)) {
+    const p = getPlayerAtSeat(state, seat);
+    if (p != null && !p.isAllIn && p.chips > 0) {
+      out.push(seat);
+    }
+  }
+  return out;
+}
+
+/** True when at least two non-folded players can still take betting actions. */
+export function canContinueBetting(state: CoreGameState): boolean {
+  return getActorsWhoCanBetSeatIndexes(state).length >= 2;
+}
+
 /** In the current hand: may take a betting action (not folded, not all-in, has chips to act). */
 export function canActNow(state: CoreGameState, seat: SeatIndex): boolean {
   return needsToAct(state, seat);

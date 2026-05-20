@@ -511,6 +511,39 @@ describe('validation', () => {
   });
 });
 
+describe('rank normalization', () => {
+  it('maps T alias to 10 so hole cards count in seven-card evaluation', () => {
+    const board = [
+      c('A', 's'),
+      c('4', 'c'),
+      c('4', 's'),
+      c('J', 'c'),
+      c('3', 'd'),
+    ];
+    const withAlias = evaluateBestHand([
+      c('A', 'c'),
+      Object.freeze({ r: 'T' as Card['r'], s: 's' }),
+      ...board,
+    ]);
+    const canonical = evaluateBestHand([c('A', 'c'), c('10', 's'), ...board]);
+    expect(withAlias.category).toBe(HandCategory.TwoPair);
+    expect(compareEvaluatedHands(withAlias, canonical)).toBe(0);
+  });
+
+  it('reported split-pot hand: c32c beats ASD when tens are included', () => {
+    const board = [
+      c('A', 's'),
+      c('4', 'c'),
+      c('4', 's'),
+      c('J', 'c'),
+      c('3', 'd'),
+    ];
+    const asd = evaluateBestHand([c('9', 'c'), c('6', 'd'), ...board]);
+    const c32c = evaluateBestHand([c('A', 'c'), c('10', 's'), ...board]);
+    expect(compareEvaluatedHands(c32c, asd)).toBeGreaterThan(0);
+  });
+});
+
 describe('wheel edge — duplicate rank does not break straight when choosing 5', () => {
   it('still finds straight among 7 with a pair', () => {
     const h = evaluateBestHand([

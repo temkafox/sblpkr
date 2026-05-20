@@ -170,7 +170,14 @@ describe('socket client', () => {
 
     fire(SERVER_ROOM_STATE, {
       ...roomState,
-      players: [{ playerId: 'solo', nickname: 'Solo', seatIndex: 0 }],
+      players: [
+        {
+          playerId: 'solo',
+          nickname: 'Solo',
+          seatIndex: 0,
+          connectionStatus: 'connected',
+        },
+      ],
     });
 
     expect(useGameStore.getState().gameState).toBeNull();
@@ -252,7 +259,14 @@ describe('socket client', () => {
     useRoomStore.setState({
       roomState: {
         ...roomState,
-        players: [{ playerId: 'new-a', nickname: 'Alice', seatIndex: 0 }],
+        players: [
+          {
+            playerId: 'new-a',
+            nickname: 'Alice',
+            seatIndex: 0,
+            connectionStatus: 'connected',
+          },
+        ],
       },
     });
 
@@ -294,6 +308,7 @@ describe('socket client', () => {
       roomId: roomState.roomId,
       handId: 'hand-1',
       handNumber: 1,
+      revision: 1,
       streets: [
         {
           street: 'PRE-FLOP',
@@ -314,6 +329,43 @@ describe('socket client', () => {
     fire(SERVER_HAND_HISTORY, history);
 
     expect(useGameStore.getState().handHistory[0]?.rows[0]?.act).toBe('calls $2');
+  });
+
+  it('SERVER_HAND_HISTORY ignores duplicate revision snapshots', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    const history: HandHistoryPayload = {
+      roomId: roomState.roomId,
+      handId: 'hand-1',
+      handNumber: 1,
+      revision: 3,
+      streets: [
+        {
+          street: 'PRE-FLOP',
+          entries: [
+            {
+              seq: 0,
+              street: 'PRE-FLOP',
+              text: 'Hero calls $2',
+              nickname: 'Hero',
+              actionKind: 'call',
+              amount: 2,
+            },
+          ],
+        },
+      ],
+    };
+
+    fire(SERVER_HAND_HISTORY, history);
+    const firstRows = useGameStore.getState().handHistory[0]?.rows.length;
+
+    fire(SERVER_HAND_HISTORY, history);
+
+    expect(useGameStore.getState().handHistoryRevision).toBe(3);
+    expect(useGameStore.getState().handHistory[0]?.rows.length).toBe(firstRows);
   });
 
   it('SERVER_HAND_RESULT updates gameStore', async () => {
@@ -484,12 +536,14 @@ describe('socket client', () => {
     fire('connect');
     await connectPromise;
 
-    const joinPromise = joinRoom(roomState.roomId);
+    const clientSessionId = 'test-client-session';
+    const joinPromise = joinRoom(roomState.roomId, clientSessionId);
     fire(SERVER_ROOM_STATE, roomState);
 
     await expect(joinPromise).resolves.toEqual(roomState);
     expect(mockEmit).toHaveBeenCalledWith('CLIENT_JOIN_ROOM', {
       roomId: roomState.roomId,
+      clientSessionId,
     });
   });
 });

@@ -1,5 +1,6 @@
 import type { Card, Rank, Suit } from '@neonpoker/shared';
 
+import { normalizeRank } from '../domain/normalize-rank';
 import { DuplicateCardError, InvalidHandError } from './errors';
 
 /** Weakest → strongest for `compareEvaluatedHands` / `categoryRank`. */
@@ -63,8 +64,24 @@ const SUIT_ORDER: Readonly<Record<Suit, number>> = Object.freeze({
   s: 3,
 });
 
-function rankToNum(r: Rank): number {
-  return RANK_TO_NUM[r];
+function rankToNum(r: Rank | string): number {
+  const normalized = normalizeRank(String(r));
+  const value = RANK_TO_NUM[normalized];
+  if (value == null) {
+    throw new InvalidHandError(`Unknown card rank: ${r}`);
+  }
+  return value;
+}
+
+function normalizeCard(c: Card): Card {
+  return Object.freeze({
+    r: normalizeRank(c.r),
+    s: c.s,
+  });
+}
+
+function normalizeCards(cards: readonly Card[]): readonly Card[] {
+  return Object.freeze(cards.map(normalizeCard));
 }
 
 function cardKey(c: Card): string {
@@ -262,7 +279,15 @@ function evaluateFiveCards(cardsInput: readonly Card[]): EvaluatedHand {
   if (rc[0]!.count === 2 && rc[1]!.count === 2) {
     const hi = rc[0]!.rank;
     const lo = rc[1]!.rank;
-    const k = rc[2]!.rank;
+    const kickerCard = cards.find(
+      (c) => rankToNum(c.r) !== hi && rankToNum(c.r) !== lo,
+    );
+    const k = rc[2]?.rank ?? (kickerCard != null ? rankToNum(kickerCard.r) : 0);
+    if (kickerCard == null && rc[2] == null) {
+      throw new InvalidHandError(
+        'Two pair evaluation requires five distinct ranked cards',
+      );
+    }
     return Object.freeze({
       category: HandCategory.TwoPair,
       categoryRank: HandCategory.TwoPair,
@@ -312,9 +337,10 @@ export function evaluateBestHand(cards: readonly Card[]): EvaluatedHand {
       `evaluateBestHand expects 5–7 cards, got ${cards.length}`,
     );
   }
-  assertNoDuplicateCards(cards);
+  const normalized = normalizeCards(cards);
+  assertNoDuplicateCards(normalized);
 
-  const combos = combinations5(cards);
+  const combos = combinations5(normalized);
   let best = evaluateFiveCards(combos[0]!);
   for (let i = 1; i < combos.length; i++) {
     best = pickStrongerEval(best, evaluateFiveCards(combos[i]!));

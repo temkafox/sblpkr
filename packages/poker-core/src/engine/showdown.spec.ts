@@ -8,7 +8,7 @@ import type { PlayerRuntimeState } from '../domain/player-state';
 import { createInitialGameState } from '../domain/game-state';
 
 import { DuplicateCardError, ShowdownNotReadyError } from './errors';
-import { HandCategory } from './hand-evaluator';
+import { evaluateBestHand, HandCategory } from './hand-evaluator';
 import {
   determineShowdownWinners,
   distributePots,
@@ -647,5 +647,66 @@ describe('returnableUncalled fold-win integration', () => {
     expect(next.playersById['hero']!.chips).toBe(
       g.playersById['hero']!.chips + 100 + 100,
     );
+  });
+});
+
+describe('showdown — aces and fours vs pair of fours (split-pot bug)', () => {
+  const board = Object.freeze([
+    C('A', 's'),
+    C('4', 'c'),
+    C('4', 's'),
+    C('J', 'c'),
+    C('3', 'd'),
+  ]);
+
+  it('c32c wins the full $800 pot — not a split', () => {
+    const g = buildShowdownGame({
+      dealerSeatIndex: 0,
+      board,
+      players: [
+        {
+          playerId: 'asd',
+          seatIndex: 0,
+          startingChips: 800,
+          totalCommitted: 400,
+          holeCards: [C('9', 'c'), C('6', 'd')],
+        },
+        {
+          playerId: 'c32c',
+          seatIndex: 1,
+          startingChips: 800,
+          totalCommitted: 400,
+          holeCards: [C('A', 'c'), C('10', 's')],
+        },
+      ],
+      hand: {
+        street: 'SHOWDOWN',
+        showdownReady: true,
+        pots: Object.freeze({ total: 800, sidePots: Object.freeze([]) }),
+      },
+    });
+
+    const result = determineShowdownWinners(g);
+    expect(result.winners).toEqual([1]);
+    expect(result.potResults).toHaveLength(1);
+    expect(result.potResults[0]!.awardedAmountsBySeatIndex[1]).toBe(800);
+    expect(result.potResults[0]!.awardedAmountsBySeatIndex[0] ?? 0).toBe(0);
+    expect(result.evaluatedHandsBySeatIndex[1]?.category).toBe(
+      HandCategory.TwoPair,
+    );
+    expect(result.evaluatedHandsBySeatIndex[0]?.category).toBe(
+      HandCategory.OnePair,
+    );
+  });
+
+  it('does not treat board-only hands as a tie when hole cards improve', () => {
+    const asdOnlyBoard = evaluateBestHand([...board]);
+    const c32cSeven = evaluateBestHand([
+      C('A', 'c'),
+      C('10', 's'),
+      ...board,
+    ]);
+    expect(asdOnlyBoard.category).toBe(HandCategory.OnePair);
+    expect(c32cSeven.category).toBe(HandCategory.TwoPair);
   });
 });

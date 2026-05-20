@@ -27,14 +27,16 @@ const soloRoom: RoomStatePayload = {
   code: 'ABC123',
   maxSeats: 9,
   status: 'waiting',
-  players: [{ playerId: 'a', nickname: 'ljhh', seatIndex: 0 }],
+  players: [
+    { playerId: 'a', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
+  ],
 };
 
 const duoRoom: RoomStatePayload = {
   ...soloRoom,
   players: [
-    { playerId: 'a', nickname: 'ljhh', seatIndex: 0 },
-    { playerId: 'b', nickname: 'ASD', seatIndex: 1 },
+    { playerId: 'a', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
+    { playerId: 'b', nickname: 'ASD', seatIndex: 1, connectionStatus: 'connected' },
   ],
 };
 
@@ -376,6 +378,113 @@ describe('TablePage live room', () => {
     const { container } = renderTable();
     expect(container.querySelector('.np-pot-amt')?.textContent).toBe('$76');
     expect(container.textContent).not.toMatch(/\$\d+\.\d+/);
+  });
+
+  it('shows AWAY on disconnected opponent during active hand', () => {
+    useRoomStore.getState().setRoomState({
+      ...duoRoom,
+      players: [
+        { playerId: 'a', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
+        { playerId: 'b', nickname: 'ASD', seatIndex: 1, connectionStatus: 'disconnected' },
+      ],
+    });
+    useGameStore.getState().setGameState({
+      ...liveState,
+      activeSeatIndex: 1,
+      seats: [
+        { ...liveState.seats[0]! },
+        {
+          ...liveState.seats[1]!,
+          connectionStatus: 'disconnected',
+          lastAction: { kind: 'call', amount: 2 },
+        },
+      ],
+    });
+    const { container } = renderTable();
+    const awayLabels = [...container.querySelectorAll('.status.t-away')].map(
+      (el) => el.textContent,
+    );
+    expect(awayLabels.some((t) => t?.includes('AWAY'))).toBe(true);
+    expect(container.querySelector('.status.t-turn')?.textContent).not.toBe(
+      'YOUR TURN',
+    );
+  });
+
+  it('shows WINNER on completed hand winner seat instead of last action label', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      handEndKind: 'SHOWDOWN',
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      availableActions: undefined,
+      winnerSeatIndexes: [0],
+      seats: [
+        {
+          ...liveState.seats[0]!,
+          isWinner: true,
+          lastAction: { kind: 'raise', amount: 40 },
+        },
+        {
+          ...liveState.seats[1]!,
+          hasFolded: true,
+          lastAction: { kind: 'call', amount: 10 },
+        },
+      ],
+    });
+    const { container } = renderTable();
+    const heroStatus = container.querySelector('.seat.hero .status');
+    expect(heroStatus?.textContent).toMatch(/WINNER/i);
+    expect(heroStatus?.textContent).not.toMatch(/RAISE/i);
+  });
+
+  it('hides ActionBar after heads-up all-in call completes to SHOWDOWN', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      handEndKind: 'SHOWDOWN',
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      availableActions: undefined,
+      boardCards: [
+        { r: '2', s: 'h' },
+        { r: '3', s: 'd' },
+        { r: '4', s: 'c' },
+        { r: '5', s: 's' },
+        { r: '6', s: 'h' },
+      ],
+      seats: [
+        {
+          ...liveState.seats[0]!,
+          stack: 0,
+          isAllIn: true,
+          currentBet: 0,
+          holeCards: [
+            { r: 'A', s: 'h' },
+            { r: 'K', s: 'h' },
+          ],
+        },
+        {
+          ...liveState.seats[1]!,
+          stack: 298,
+          isAllIn: false,
+          currentBet: 0,
+          holeCards: [
+            { r: 'Q', s: 'c' },
+            { r: 'J', s: 'c' },
+          ],
+        },
+      ],
+    });
+    const { container } = renderTable();
+    expect(container.querySelector('.table-page__room-meta')?.textContent).toMatch(
+      /HAND COMPLETE · SHOWDOWN/i,
+    );
+    expect(container.querySelector('.np-action-bar')).toBeNull();
+    expect(screen.queryByRole('button', { name: /check/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /raise/i })).not.toBeInTheDocument();
   });
 
   it('shows result banner after handResult and disables ActionBar when hand complete', () => {

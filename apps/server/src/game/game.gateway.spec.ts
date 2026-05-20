@@ -114,6 +114,7 @@ describe('Game gateway (Phase 6C2)', () => {
       handHistory,
     );
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
+    gateway.onModuleInit();
 
     httpServer = createServer();
     io = new Server(httpServer, { cors: { origin: true } });
@@ -145,11 +146,23 @@ describe('Game gateway (Phase 6C2)', () => {
       new Promise<void>((r) => a.once('connect', () => r())),
       new Promise<void>((r) => b.once('connect', () => r())),
     ]);
-    a.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Alpha' });
-    b.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Beta' });
-    a.emit(CLIENT_JOIN_ROOM, { roomId });
+    a.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Alpha',
+      clientSessionId: 'gw-game-alpha',
+    });
+    b.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Beta',
+      clientSessionId: 'gw-game-beta',
+    });
+    a.emit(CLIENT_JOIN_ROOM, {
+      roomId,
+      clientSessionId: 'gw-game-alpha',
+    });
     await waitForEvent(a, SERVER_ROOM_STATE);
-    b.emit(CLIENT_JOIN_ROOM, { roomId });
+    b.emit(CLIENT_JOIN_ROOM, {
+      roomId,
+      clientSessionId: 'gw-game-beta',
+    });
     await waitForEvent(b, SERVER_ROOM_STATE);
     return { a, b };
   }
@@ -179,8 +192,14 @@ describe('Game gateway (Phase 6C2)', () => {
     const room = roomService.createRoom();
     const solo = connectClient(port);
     await new Promise<void>((r) => solo.once('connect', () => r()));
-    solo.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Solo' });
-    solo.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    solo.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Solo',
+      clientSessionId: 'gw-game-solo',
+    });
+    solo.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-game-solo',
+    });
     await waitForEvent(solo, SERVER_ROOM_STATE);
 
     const err = waitForEvent<{ code: string }>(solo, SERVER_ERROR);
@@ -236,7 +255,10 @@ describe('Game gateway (Phase 6C2)', () => {
     const room = roomService.createRoom({ maxSeats: 6 });
     const outsider = connectClient(port);
     await new Promise<void>((r) => outsider.once('connect', () => r()));
-    outsider.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Outsider' });
+    outsider.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Outsider',
+      clientSessionId: 'gw-game-outsider',
+    });
 
     const err = waitForEvent<{ code: string }>(outsider, SERVER_ERROR);
     outsider.emit(CLIENT_START_HAND, { roomId: room.roomId });
@@ -285,7 +307,7 @@ describe('Game gateway (Phase 6C2)', () => {
     b.disconnect();
   });
 
-  it('resets active hand and emits idle game state when a player disconnects', async () => {
+  it('keeps roster during disconnect grace without immediate hand reset', async () => {
     const room = roomService.createRoom({ maxSeats: 6 });
     const { a, b } = await seatTwo(room.roomId);
 
@@ -297,20 +319,18 @@ describe('Game gateway (Phase 6C2)', () => {
     expect(opened.handId).not.toBeNull();
 
     const roomUpdate = waitForEvent(a, SERVER_ROOM_STATE);
-    const idleState = waitForEvent(a, SERVER_GAME_STATE);
+    const gameUpdate = waitForEvent(a, SERVER_GAME_STATE);
     b.disconnect();
-    await new Promise((r) => setTimeout(r, 50));
 
-    const afterRoom = RoomStateSchema.parse(await roomUpdate);
-    expect(afterRoom.players).toHaveLength(1);
+    const afterDisconnect = RoomStateSchema.parse(await roomUpdate);
+    expect(afterDisconnect.players).toHaveLength(2);
+    const dropped = afterDisconnect.players.find((p) => p.nickname === 'Beta');
+    expect(dropped?.connectionStatus).toBe('disconnected');
 
-    const idle = PlayerGameStateSchema.parse(await idleState);
-    expect(idle.handId).toBeNull();
-    expect(idle.boardCards).toHaveLength(0);
-    expect(idle.pot.total).toBe(0);
-    expect(idle.dealerSeatIndex).toBeNull();
-    expect(idle.activeSeatIndex).toBeNull();
-    expect(idle.seats[0]!.nickname).toBe('Alpha');
+    const afterGame = PlayerGameStateSchema.parse(await gameUpdate);
+    const droppedSeat = afterGame.seats.find((s) => s.nickname === 'Beta');
+    expect(droppedSeat?.connectionStatus).toBe('disconnected');
+    expect(JSON.stringify(afterGame)).not.toContain('socketId');
 
     a.disconnect();
   });

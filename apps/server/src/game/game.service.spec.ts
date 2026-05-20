@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { CoreGameState, SeatIndex } from '@neonpoker/poker-core';
 import {
+  createInitialGameState,
   createSeededRandom,
   getAvailableActions,
   getPlayerAtSeat,
@@ -9,7 +10,7 @@ import {
 } from '@neonpoker/poker-core';
 import type { PlayerActionIntent } from '@neonpoker/shared';
 
-import { RoomService } from '../room/room.service';
+import { DISCONNECT_GRACE_MS, RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
 import {
   DEFAULT_BIG_BLIND,
@@ -51,8 +52,14 @@ function seatRoom(
   const room = roomService.createRoom({ maxSeats });
   for (let i = 0; i < playerCount; i++) {
     const sid = `sock-${i}`;
-    roomService.registerNickname(sid, { nickname: `Player_${i}` });
-    roomService.joinRoom(sid, { roomId: room.roomId });
+    roomService.registerNickname(sid, {
+      nickname: `Player_${i}`,
+      clientSessionId: `session-${i}`,
+    });
+    roomService.joinRoom(sid, {
+      roomId: room.roomId,
+      clientSessionId: `session-${i}`,
+    });
   }
   return room.roomId;
 }
@@ -128,12 +135,24 @@ describe('GameService (Phase 6C1)', () => {
     const room = roomService.createRoom({ maxSeats: 6 });
     const roomId = room.roomId;
 
-    roomService.registerNickname('sock-0', { nickname: 'First' });
-    roomService.joinRoom('sock-0', { roomId });
+    roomService.registerNickname('sock-0', {
+      nickname: 'First',
+      clientSessionId: 'session-0',
+    });
+    roomService.joinRoom('sock-0', {
+      roomId,
+      clientSessionId: 'session-0',
+    });
     game.getGameState(roomId);
 
-    roomService.registerNickname('sock-1', { nickname: 'Second' });
-    roomService.joinRoom('sock-1', { roomId });
+    roomService.registerNickname('sock-1', {
+      nickname: 'Second',
+      clientSessionId: 'session-1',
+    });
+    roomService.joinRoom('sock-1', {
+      roomId,
+      clientSessionId: 'session-1',
+    });
 
     const state = game.getGameState(roomId);
     const secondId = roomService.getRoom(roomId)!.players[1]!.playerId;
@@ -326,7 +345,11 @@ describe('GameService (Phase 6C1)', () => {
 
     const room = roomService.getRoom(roomId)!;
     const leaverSocket = room.players[1]!.socketId;
-    roomService.handleDisconnect(leaverSocket);
+    expect(leaverSocket).not.toBeNull();
+    vi.useFakeTimers();
+    roomService.handleDisconnect(leaverSocket!);
+    vi.advanceTimersByTime(DISCONNECT_GRACE_MS + 50);
+    vi.useRealTimers();
 
     expect(game.abortHandIfInsufficientPlayers(roomId)).toBe(true);
     expect(tableService.hasTable(roomId)).toBe(false);
@@ -424,6 +447,63 @@ describe('GameService (Phase 6C1)', () => {
     expect(idle.playersById[loserId]!.holeCards.length).toBe(0);
   });
 
+  it('HU all-in call with chips behind runs out to SHOWDOWN without further actions', () => {
+    const { roomService, game, tableService } = gameHarness('hu-cover-call');
+    const roomId = seatRoom(roomService, 2, 6);
+    const room = roomService.getRoom(roomId)!;
+    const shortId = room.players[0]!.playerId;
+    const deepId = room.players[1]!.playerId;
+
+    let idle = createInitialGameState({
+      table: {
+        tableId: roomId,
+        maxSeats: 6,
+        smallBlind: DEFAULT_SMALL_BLIND,
+        bigBlind: DEFAULT_BIG_BLIND,
+      },
+      players: [
+        { playerId: shortId, seatIndex: 0, startingChips: 200 },
+        { playerId: deepId, seatIndex: 1, startingChips: 500 },
+      ],
+    });
+    idle = Object.freeze({
+      ...idle,
+      table: Object.freeze({ ...idle.table, dealerSeatIndex: 1 }),
+    });
+    tableService.setTableState(roomId, idle);
+
+    game.startHand(roomId);
+    let state = game.getGameState(roomId);
+    const sbSeat = state.table.smallBlindSeatIndex;
+    const bbSeat = state.table.bigBlindSeatIndex;
+
+    state = act(game, roomId, { kind: 'allin' }, sbSeat);
+    expect(state.playersById[shortId]!.chips).toBe(0);
+    expect(state.playersById[shortId]!.isAllIn).toBe(true);
+    expect(getAvailableActions(state, bbSeat).canCall).toBe(true);
+
+    state = act(game, roomId, { kind: 'call' }, bbSeat);
+    expect(state.playersById[deepId]!.chips).toBeGreaterThan(0);
+    expect(state.playersById[deepId]!.isAllIn).toBe(false);
+    expect(state.hand?.street).toBe('SHOWDOWN');
+    expect(state.hand?.isComplete).toBe(true);
+    expect(state.hand?.showdownReady).toBe(true);
+    expect(state.hand?.boardCards.length).toBe(5);
+    expect(state.table.activeSeatIndex).toBeNull();
+    expect(getAvailableActions(state, bbSeat).canRaise).toBe(false);
+
+    const view = toPlayerGameState(state, bbSeat, room);
+    expect(view.handComplete).toBe(true);
+    expect(view.handEndKind).toBe('SHOWDOWN');
+    expect(view.availableActions).toBeUndefined();
+    expect(view.seats[sbSeat]!.holeCards).toHaveLength(2);
+    expect(view.seats[bbSeat]!.holeCards).toHaveLength(2);
+
+    const result = tableService.getHandResult(roomId);
+    expect(result).not.toBeNull();
+    expect(result!.totalAwarded).toBeGreaterThan(0);
+  });
+
   it('getGameState keeps all-in zero-stack player in hand so opponent can call', () => {
     const { roomService, game } = gameHarness('allin-call-path');
     const roomId = seatRoom(roomService, 2, 6);
@@ -492,7 +572,11 @@ describe('GameService (Phase 6C1)', () => {
     const room = roomService.getRoom(roomId)!;
     const departedId = room.players[2]!.playerId;
     const leaverSocket = room.players[2]!.socketId;
-    roomService.handleDisconnect(leaverSocket);
+    expect(leaverSocket).not.toBeNull();
+    vi.useFakeTimers();
+    roomService.handleDisconnect(leaverSocket!);
+    vi.advanceTimersByTime(DISCONNECT_GRACE_MS + 50);
+    vi.useRealTimers();
 
     expect(roomService.getRoom(roomId)!.players).toHaveLength(2);
 

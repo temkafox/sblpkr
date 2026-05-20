@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyAction } from './actions';
-import { advanceStreet } from './street';
+import { advanceStreet, canAdvanceStreet } from './street';
 import {
   CoreGameState,
   createInitialGameState,
   createSeededRandom,
+  canContinueBetting,
   getAvailableActions,
   getNonFoldedSeatIndexes,
   isBettingRoundComplete,
@@ -36,6 +37,29 @@ function huStartedSmallBlinds(): CoreGameState {
   });
 
   return startHand(patched, { rng });
+}
+
+function huUnequalStacks(): CoreGameState {
+  const base = createInitialGameState({
+    table: {
+      tableId: 'hu-unequal',
+      maxSeats: 6,
+      smallBlind: 5,
+      bigBlind: 10,
+    },
+    players: [
+      { playerId: 'short', seatIndex: 0, startingChips: 200 },
+      { playerId: 'deep', seatIndex: 3, startingChips: 500 },
+    ],
+  });
+
+  return startHand(
+    Object.freeze({
+      ...base,
+      table: Object.freeze({ ...base.table, dealerSeatIndex: 3 }),
+    }),
+    { rng: createSeededRandom('hu-unequal-ai') },
+  );
 }
 
 function sixMaxThreeWay(): CoreGameState {
@@ -158,6 +182,148 @@ describe('all-in at zero chips during active hand', () => {
 
     const resolved = resolveShowdown(g);
     expect(resolved.hand?.isComplete).toBe(true);
+  });
+
+  it('canContinueBetting is false when only one player can still bet', () => {
+    let g = huUnequalStacks();
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+
+    g = applyAction(g, sbSeat, { kind: 'allin' });
+    g = applyAction(g, bbSeat, { kind: 'call' });
+
+    expect(canContinueBetting(g)).toBe(false);
+    expect(isBettingRoundComplete(g)).toBe(true);
+  });
+
+  it('HU: short all-in, deep call with chips behind auto-runs out to SHOWDOWN', () => {
+    let g = huUnequalStacks();
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+    const shortId = g.table.seats[sbSeat]!.playerId!;
+    const deepId = g.table.seats[bbSeat]!.playerId!;
+
+    g = applyAction(g, sbSeat, { kind: 'allin' });
+    expect(g.playersById[shortId]!.chips).toBe(0);
+    expect(g.playersById[shortId]!.isAllIn).toBe(true);
+
+    g = applyAction(g, bbSeat, { kind: 'call' });
+    expect(g.playersById[deepId]!.chips).toBeGreaterThan(0);
+    expect(g.playersById[deepId]!.isAllIn).toBe(false);
+    expect(g.table.activeSeatIndex).toBeNull();
+    expect(canContinueBetting(g)).toBe(false);
+
+    g = advanceStreet(g);
+    expect(g.hand?.street).toBe('SHOWDOWN');
+    expect(g.hand?.showdownReady).toBe(true);
+    expect(g.hand?.boardCards.length).toBe(5);
+    expect(g.table.activeSeatIndex).toBeNull();
+
+    const actions = getAvailableActions(g, bbSeat);
+    expect(actions.canCheck).toBe(false);
+    expect(actions.canRaise).toBe(false);
+    expect(actions.canCall).toBe(false);
+  });
+
+  it('turn all-in call runs out river and showdown without further betting', () => {
+    const base = createInitialGameState({
+      table: {
+        tableId: 'turn-ai',
+        maxSeats: 6,
+        smallBlind: 5,
+        bigBlind: 10,
+      },
+      players: [
+        { playerId: 'short', seatIndex: 0, startingChips: 200 },
+        { playerId: 'deep', seatIndex: 1, startingChips: 500 },
+      ],
+    });
+
+    let g = startHand(
+      Object.freeze({
+        ...base,
+        table: Object.freeze({ ...base.table, dealerSeatIndex: 1 }),
+      }),
+      { rng: createSeededRandom('turn-ai-runout') },
+    );
+
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+
+    while (g.hand?.street === 'PRE-FLOP' && g.table.activeSeatIndex != null) {
+      const seat = g.table.activeSeatIndex;
+      const acts = getAvailableActions(g, seat);
+      g = applyAction(
+        g,
+        seat,
+        acts.canCheck ? { kind: 'check' } : { kind: 'call' },
+      );
+    }
+    if (canAdvanceStreet(g)) {
+      g = advanceStreet(g);
+    }
+
+    while (g.hand?.street === 'FLOP' && g.table.activeSeatIndex != null) {
+      const seat = g.table.activeSeatIndex;
+      g = applyAction(g, seat, { kind: 'check' });
+    }
+    if (canAdvanceStreet(g)) {
+      g = advanceStreet(g);
+    }
+
+    expect(g.hand?.street).toBe('TURN');
+    expect(g.hand?.boardCards.length).toBe(4);
+
+    const allInSeat = g.table.activeSeatIndex!;
+    const callerSeat = allInSeat === sbSeat ? bbSeat : sbSeat;
+    g = applyAction(g, allInSeat, { kind: 'allin' });
+    g = applyAction(g, callerSeat, { kind: 'call' });
+
+    expect(canContinueBetting(g)).toBe(false);
+    expect(isBettingRoundComplete(g)).toBe(true);
+    expect(g.table.activeSeatIndex).toBeNull();
+
+    g = advanceStreet(g);
+    expect(g.hand?.street).toBe('SHOWDOWN');
+    expect(g.hand?.boardCards.length).toBe(5);
+    expect(g.table.activeSeatIndex).toBeNull();
+    expect(getAvailableActions(g, callerSeat).canCheck).toBe(false);
+    expect(getAvailableActions(g, callerSeat).canRaise).toBe(false);
+  });
+
+  it('multiway: one all-in and two deep stacks can continue betting', () => {
+    const base = createInitialGameState({
+      table: {
+        tableId: 'mw-ai',
+        maxSeats: 6,
+        smallBlind: 5,
+        bigBlind: 10,
+      },
+      players: [
+        { playerId: 'utg', seatIndex: 1, startingChips: 200 },
+        { playerId: 'sb', seatIndex: 3, startingChips: 500 },
+        { playerId: 'bb', seatIndex: 5, startingChips: 500 },
+      ],
+    });
+
+    let g = startHand(
+      Object.freeze({
+        ...base,
+        table: Object.freeze({ ...base.table, dealerSeatIndex: 5 }),
+      }),
+      { rng: createSeededRandom('mw-ai-continue') },
+    );
+
+    const utg = g.table.activeSeatIndex!;
+    g = applyAction(g, utg, { kind: 'allin' });
+
+    const sbSeat = g.table.smallBlindSeatIndex;
+    const bbSeat = g.table.bigBlindSeatIndex;
+    g = applyAction(g, sbSeat, { kind: 'call' });
+
+    expect(canContinueBetting(g)).toBe(true);
+    expect(needsToAct(g, bbSeat)).toBe(true);
+    expect(getAvailableActions(g, bbSeat).canRaise).toBe(true);
   });
 });
 

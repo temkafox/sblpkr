@@ -10,6 +10,7 @@ import type {
   AvailableActions,
   Card,
   HandEndKind,
+  HandResultPayload,
   PublicGameState,
   PlayerGameState,
   PublicSeatAction,
@@ -103,10 +104,16 @@ function isHandComplete(state: CoreGameState): boolean {
   return hand != null && hand.isComplete;
 }
 
-function winnerSeatIndexesForState(state: CoreGameState): readonly number[] {
+function winnerSeatIndexesForState(
+  state: CoreGameState,
+  handResult: HandResultPayload | null = null,
+): readonly number[] {
   const hand = state.hand;
   if (hand == null || !hand.isComplete) {
     return Object.freeze([]);
+  }
+  if (handResult != null && handResult.handId === hand.handId) {
+    return Object.freeze(handResult.winnerSeatIndexes);
   }
   if (isFoldWinHand(state)) {
     return Object.freeze(getNonFoldedSeatIndexes(syncPotsFromCommitments(state)));
@@ -160,6 +167,12 @@ function buildSeatViews(
 ): WireSeatView[] {
   const nicknames = nicknameByPlayerId(room);
   const winnerSet = new Set(winnerSeatIndexes);
+  const connectionByPlayerId = new Map<string, WireSeatView['connectionStatus']>();
+  if (room != null) {
+    for (const member of room.players) {
+      connectionByPlayerId.set(member.playerId, member.connectionStatus);
+    }
+  }
 
   return state.table.seats.map((seat) => {
       const runtime = getPlayerAtSeat(state, seat.seatIndex);
@@ -180,6 +193,10 @@ function buildSeatViews(
         isSittingOut: runtime?.isSittingOut ?? false,
         lastAction: lastActionForSeat(state, seat.seatIndex),
         isWinner: winnerSet.has(seat.seatIndex),
+        connectionStatus:
+          seat.playerId != null
+            ? (connectionByPlayerId.get(seat.playerId) ?? 'connected')
+            : undefined,
         holeCards:
           holeCards != null ? holeCards.map((c) => ({ r: c.r, s: c.s })) : null,
         holeCardCount,
@@ -191,9 +208,10 @@ function baseView(
   state: CoreGameState,
   room: MutableInternalRoom | null,
   viewerSeatIndex: SeatIndex | null,
+  handResult: HandResultPayload | null = null,
 ): PublicGameState {
   const hand = state.hand;
-  const winners = winnerSeatIndexesForState(state);
+  const winners = winnerSeatIndexesForState(state, handResult);
 
   return {
     tableId: state.table.tableId,
@@ -219,8 +237,9 @@ function baseView(
 export function toPublicGameState(
   state: CoreGameState,
   room: MutableInternalRoom | null = null,
+  handResult: HandResultPayload | null = null,
 ): PublicGameState {
-  return baseView(state, room, null);
+  return baseView(state, room, null, handResult);
 }
 
 /** Per-viewer snapshot — only the viewer seat includes hole card faces. */
@@ -229,8 +248,9 @@ export function toPlayerGameState(
   state: CoreGameState,
   viewerSeatIndex: SeatIndex,
   room: MutableInternalRoom | null = null,
+  handResult: HandResultPayload | null = null,
 ): PlayerGameState {
-  const base = baseView(state, room, viewerSeatIndex);
+  const base = baseView(state, room, viewerSeatIndex, handResult);
 
   let availableActions: AvailableActions | undefined;
   const hand = state.hand;

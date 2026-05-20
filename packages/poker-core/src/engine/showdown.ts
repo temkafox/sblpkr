@@ -13,6 +13,7 @@ import {
   PotDistributionError,
   ShowdownNotReadyError,
 } from './errors';
+import type { Card } from '../domain/card';
 import type { EvaluatedHand } from './hand-evaluator';
 import {
   compareEvaluatedHands,
@@ -82,6 +83,24 @@ function assertCanResolve(state: CoreGameState): void {
   }
 }
 
+/** Exactly five board cards plus two private hole cards — never board-only. */
+export function buildShowdownCardPool(
+  holeCards: readonly Card[],
+  boardCards: readonly Card[],
+): readonly Card[] {
+  if (holeCards.length !== 2) {
+    throw new ShowdownNotReadyError(
+      `Showdown requires two hole cards, got ${holeCards.length}`,
+    );
+  }
+  if (boardCards.length !== 5) {
+    throw new ShowdownNotReadyError(
+      `Showdown requires five board cards, got ${boardCards.length}`,
+    );
+  }
+  return Object.freeze([...holeCards, ...boardCards]);
+}
+
 function seatsWithShowdownHoleCards(state: CoreGameState): ReadonlySet<SeatIndex> {
   const out = new Set<SeatIndex>();
   for (const s of state.table.seats) {
@@ -141,7 +160,12 @@ export function determineShowdownWinners(state: CoreGameState): ShowdownResult {
     Object.create(null);
   for (const seat of contestants) {
     const p = getPlayerAtSeat(state, seat)!;
-    const seven = [...p.holeCards, ...board];
+    if (p.holeCards.length !== 2) {
+      throw new ShowdownNotReadyError(
+        `Contestant seat ${seat} must have exactly two hole cards at showdown`,
+      );
+    }
+    const seven = buildShowdownCardPool(p.holeCards, board);
     evaluatedHandsBySeatIndex[seat] = evaluateBestHand(seven);
   }
 

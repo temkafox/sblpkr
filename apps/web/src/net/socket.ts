@@ -187,8 +187,11 @@ export function disconnectSocket(): void {
   setConnectionStatus('idle');
 }
 
-export function registerNickname(nickname: string): void {
-  socket?.emit(CLIENT_REGISTER_NICKNAME, { nickname });
+export function registerNickname(
+  nickname: string,
+  clientSessionId: string,
+): void {
+  socket?.emit(CLIENT_REGISTER_NICKNAME, { nickname, clientSessionId });
 }
 
 export function leaveRoom(roomId?: string): void {
@@ -201,7 +204,10 @@ export function leaveRoom(roomId?: string): void {
   useGameStore.getState().clearHandHistory();
 }
 
-export function joinRoom(roomId: string): Promise<RoomStatePayload> {
+export function joinRoom(
+  roomId: string,
+  clientSessionId: string,
+): Promise<RoomStatePayload> {
   return new Promise((resolve, reject) => {
     if (!socket?.connected) {
       reject(new Error('Socket not connected'));
@@ -241,7 +247,7 @@ export function joinRoom(roomId: string): Promise<RoomStatePayload> {
       finish(() => reject(new Error('Join timed out')));
     }, JOIN_TIMEOUT_MS);
 
-    socket.emit(CLIENT_JOIN_ROOM, { roomId });
+    socket.emit(CLIENT_JOIN_ROOM, { roomId, clientSessionId });
   });
 }
 

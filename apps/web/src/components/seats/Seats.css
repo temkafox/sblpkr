@@ -356,9 +356,23 @@
     0 6px 14px rgba(0, 0, 0, 0.55);
 }
 
-.seat.state-sitout {
+.seat.state-sitout,
+.seat.state-away {
   opacity: 0.55;
   filter: saturate(0.45);
+}
+
+.seat.state-away .body {
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55) inset,
+    0 0 12px rgba(148, 163, 184, 0.25);
+}
+
+.status.t-away {
+  color: var(--text-lo);
+  letter-spacing: 0.12em;
+  text-shadow: none;
 }
 
 .status.t-fold {

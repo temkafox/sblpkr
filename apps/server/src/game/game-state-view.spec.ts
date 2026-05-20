@@ -31,13 +31,17 @@ function sampleRoom(): MutableInternalRoom {
         playerId: 'p0',
         nickname: 'Alpha',
         seatIndex: null,
+        clientSessionId: 'gv-p0',
         socketId: 'sock-0',
+        connectionStatus: 'connected',
       },
       {
         playerId: 'p1',
         nickname: 'Beta',
         seatIndex: null,
+        clientSessionId: 'gv-p1',
         socketId: 'sock-1',
+        connectionStatus: 'connected',
       },
     ],
   };
@@ -154,6 +158,16 @@ describe('game-state-view (Phase 6C2)', () => {
     expect(seat.lastAction?.amount).toBeGreaterThan(0);
     expect(containsPrivateEngineFields(view)).toBe(false);
     expect(JSON.stringify(view).includes('deck')).toBe(false);
+  });
+
+  it('exposes disconnected connectionStatus on wire seats', () => {
+    const room = sampleRoom();
+    room.players[0]!.connectionStatus = 'disconnected';
+    room.players[0]!.socketId = null;
+
+    const view = toPlayerGameState(huState(), 1, room);
+    expect(view.seats[0]?.connectionStatus).toBe('disconnected');
+    expect(JSON.stringify(view)).not.toContain('socketId');
   });
 
   it('marks winner seats when hand is complete', () => {

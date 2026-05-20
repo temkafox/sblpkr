@@ -5,6 +5,7 @@ import {
   createSeededRandom,
   startHand,
 } from '@neonpoker/poker-core';
+import type { Card } from '@neonpoker/shared';
 import { HandHistoryPayloadSchema } from '@neonpoker/shared';
 
 import type { MutableInternalRoom } from '../room/room.types';
@@ -27,13 +28,17 @@ function sampleRoom(): MutableInternalRoom {
         playerId: 'p0',
         nickname: 'Alpha',
         seatIndex: 0,
+        clientSessionId: 'hh-p0',
         socketId: 'sock-0',
+        connectionStatus: 'connected',
       },
       {
         playerId: 'p1',
         nickname: 'Beta',
         seatIndex: 1,
+        clientSessionId: 'hh-p1',
         socketId: 'sock-1',
+        connectionStatus: 'connected',
       },
     ],
   };
@@ -134,6 +139,69 @@ describe('HandHistoryService', () => {
     expect(text.some((t) => t.includes('wins'))).toBe(true);
   });
 
+  it('logs a single winner line for aces-and-fours showdown (no false split)', () => {
+    const svc = new HandHistoryService();
+    const room = sampleRoom();
+    const C = (r: Card['r'], s: Card['s']): Card => Object.freeze({ r, s });
+    const board: readonly Card[] = [
+      C('A', 's'),
+      C('4', 'c'),
+      C('4', 's'),
+      C('J', 'c'),
+      C('3', 'd'),
+    ];
+    const base = huTable();
+    let state = startHand(base, { rng });
+    const playersById = { ...state.playersById };
+    const asdId = 'p0';
+    const c32Id = 'p1';
+    playersById[asdId] = Object.freeze({
+      ...playersById[asdId]!,
+      chips: 400,
+      totalCommitted: 400,
+      holeCards: Object.freeze([C('9', 'c'), C('6', 'd')]),
+    });
+    playersById[c32Id] = Object.freeze({
+      ...playersById[c32Id]!,
+      chips: 400,
+      totalCommitted: 400,
+      holeCards: Object.freeze([C('A', 'c'), C('10', 's')]),
+    });
+    state = Object.freeze({
+      ...state,
+      playersById: Object.freeze(playersById),
+      hand: Object.freeze({
+        ...state.hand!,
+        street: 'SHOWDOWN' as const,
+        showdownReady: true,
+        boardCards: Object.freeze(board),
+        pots: Object.freeze({ total: 800, sidePots: Object.freeze([]) }),
+      }),
+    });
+
+    svc.onHandStarted(room, startHand(huTable(), { rng }));
+    const before = state;
+    const progressed = progressGameState(state, room);
+    svc.onProgress(
+      room,
+      before,
+      progressed.state,
+      progressed.showdownResult,
+      progressed.isFoldWin,
+    );
+
+    const winners = progressed.showdownResult?.winners ?? [];
+    expect(winners).toEqual([1]);
+
+    const text = svc
+      .buildPayload(room.roomId)
+      .streets.flatMap((s) => s.entries.map((e) => e.text));
+    const winLines = text.filter((t) => t.includes('wins $'));
+    expect(winLines).toHaveLength(1);
+    expect(winLines[0]).toMatch(/Beta wins \$800/);
+    expect(text.some((t) => t.match(/Alpha wins \$400/))).toBe(false);
+  });
+
   it('appends fold-win result without board', () => {
     const svc = new HandHistoryService();
     const room = sampleRoom();
@@ -166,5 +234,20 @@ describe('HandHistoryService', () => {
     svc.onRebuy(room, 1, 200);
     const payload = svc.buildPayload(room.roomId);
     expect(payload.streets[0]?.entries[0]?.text).toMatch(/Beta rebuy \$200/);
+  });
+
+  it('caps stored entries at 200 per room', () => {
+    const svc = new HandHistoryService();
+    const room = sampleRoom();
+    for (let i = 0; i < 250; i++) {
+      svc.onRebuy(room, 1, 200);
+    }
+    const payload = svc.buildPayload(room.roomId);
+    const total = payload.streets.reduce(
+      (count, section) => count + section.entries.length,
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(200);
+    expect(payload.revision).toBeGreaterThan(0);
   });
 });

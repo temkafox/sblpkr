@@ -6,8 +6,10 @@ import {
   getNonFoldedSeatIndexes,
   isBettingRoundComplete,
   resolveShowdown,
-  syncPotsFromCommitments,
 } from '@neonpoker/poker-core';
+
+import type { MutableInternalRoom } from '../room/room.types';
+import { logShowdownResolution } from './showdown-debug';
 
 export type ProgressGameStateResult = {
   readonly state: CoreGameState;
@@ -17,10 +19,14 @@ export type ProgressGameStateResult = {
 
 function resolveWithTracking(
   state: CoreGameState,
+  room: MutableInternalRoom | null = null,
 ): ProgressGameStateResult {
-  const synced = syncPotsFromCommitments(state);
-  const isFoldWin = getNonFoldedSeatIndexes(synced).length === 1;
+  const isFoldWin = getNonFoldedSeatIndexes(state).length === 1;
   const showdownResult = computeShowdownResult(state);
+
+  if (!isFoldWin) {
+    logShowdownResolution(state, showdownResult, room);
+  }
 
   return {
     state: resolveShowdown(state),
@@ -36,13 +42,14 @@ function resolveWithTracking(
 
 export function progressGameState(
   state: CoreGameState,
+  room: MutableInternalRoom | null = null,
 ): ProgressGameStateResult {
   let g = state;
   let guard = 0;
 
   while (g.hand != null && !g.hand.isComplete && guard++ < 40) {
     if (g.hand.showdownReady) {
-      return resolveWithTracking(g);
+      return resolveWithTracking(g, room);
     }
 
     if (isBettingRoundComplete(g) && canAdvanceStreet(g)) {
@@ -58,11 +65,11 @@ export function progressGameState(
     g.hand.isComplete &&
     !g.hand.showdownReady
   ) {
-    return resolveWithTracking(g);
+    return resolveWithTracking(g, room);
   }
 
   if (g.hand?.showdownReady && !g.hand.isComplete) {
-    return resolveWithTracking(g);
+    return resolveWithTracking(g, room);
   }
 
   return { state: g, showdownResult: null, isFoldWin: false };

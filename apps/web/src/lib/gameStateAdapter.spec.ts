@@ -99,8 +99,8 @@ const roomRoster: RoomStatePayload = {
   maxSeats: 9,
   status: 'waiting',
   players: [
-    { playerId: 'p-hero', nickname: 'ljhh', seatIndex: 0 },
-    { playerId: 'p-villain', nickname: 'ASD', seatIndex: 1 },
+    { playerId: 'p-hero', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
+    { playerId: 'p-villain', nickname: 'ASD', seatIndex: 1, connectionStatus: 'connected' },
   ],
 };
 
@@ -447,10 +447,74 @@ describe('gameStateAdapter', () => {
         null,
         true,
         true,
+        [1],
       ),
     ).toBe('winner');
     expect(active({ lastAction: { kind: 'post_sb', amount: 1 } })).toBe('post_sb');
     expect(active({ lastAction: { kind: 'post_bb', amount: 2 } })).toBe('post_bb');
+  });
+
+  it('disconnected seat shows AWAY and not YOUR TURN during active hand', () => {
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(1, 'p-villain', 'Villain', {
+          connectionStatus: 'disconnected',
+          lastAction: { kind: 'call', amount: 10 },
+        }),
+        1,
+        false,
+        true,
+      ),
+    ).toBe('away');
+  });
+
+  it('winner label beats lastAction after hand completes', () => {
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(0, 'p-hero', 'Hero', {
+          isWinner: true,
+          lastAction: { kind: 'raise', amount: 40 },
+        }),
+        null,
+        true,
+        true,
+        [0],
+      ),
+    ).toBe('winner');
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(1, 'p-villain', 'Villain', {
+          lastAction: { kind: 'call', amount: 10 },
+          hasFolded: true,
+        }),
+        null,
+        true,
+        true,
+        [0],
+      ),
+    ).toBe('fold');
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(0, 'p-hero', 'Hero', {
+          lastAction: { kind: 'raise', amount: 40 },
+        }),
+        null,
+        true,
+        true,
+        [0],
+      ),
+    ).toBe('winner');
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(1, 'p-villain', 'Villain', {
+          lastAction: { kind: 'call', amount: 10 },
+        }),
+        null,
+        true,
+        true,
+        [0],
+      ),
+    ).toBe('idle');
   });
 
   it('renders busted sitout only after hand completes', () => {

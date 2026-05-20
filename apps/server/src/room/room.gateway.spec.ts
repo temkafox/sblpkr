@@ -90,6 +90,7 @@ describe('RoomGateway (Socket.IO)', () => {
       handHistory,
     );
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
+    gateway.onModuleInit();
     httpServer = createServer();
     io = new Server(httpServer, { cors: { origin: true } });
     gateway.server = io;
@@ -121,15 +122,27 @@ describe('RoomGateway (Socket.IO)', () => {
       new Promise<void>((r) => b.once('connect', () => r())),
     ]);
 
-    a.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Alice' });
-    b.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Bob' });
+    a.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Alice',
+      clientSessionId: 'gw-alice',
+    });
+    b.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Bob',
+      clientSessionId: 'gw-bob',
+    });
 
     const stateA = waitForEvent(a, SERVER_ROOM_STATE);
-    a.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    a.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-alice',
+    });
     const parsedA = RoomStateSchema.parse(await stateA);
 
     const stateB = waitForEvent(b, SERVER_ROOM_STATE);
-    b.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    b.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-bob',
+    });
     const parsedB = RoomStateSchema.parse(await stateB);
 
     expect(parsedA.players.map((p) => p.nickname)).toEqual(['Alice']);
@@ -153,14 +166,26 @@ describe('RoomGateway (Socket.IO)', () => {
       new Promise<void>((r) => b.once('connect', () => r())),
     ]);
 
-    a.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Dup' });
-    b.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'dup' });
+    a.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Dup',
+      clientSessionId: 'gw-dup-a',
+    });
+    b.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'dup',
+      clientSessionId: 'gw-dup-b',
+    });
 
-    a.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    a.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-dup-a',
+    });
     await waitForEvent(a, SERVER_ROOM_STATE);
 
     const err = waitForEvent<{ code: string }>(b, SERVER_ERROR);
-    b.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    b.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-dup-b',
+    });
 
     expect((await err).code).toBe('NICKNAME_TAKEN');
 
@@ -179,13 +204,25 @@ describe('RoomGateway (Socket.IO)', () => {
       new Promise<void>((r) => b.once('connect', () => r())),
     ]);
 
-    a.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Stay' });
-    b.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Leaver' });
+    a.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Stay',
+      clientSessionId: 'gw-stay-a',
+    });
+    b.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Leaver',
+      clientSessionId: 'gw-leave-b',
+    });
 
-    a.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    a.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-stay-a',
+    });
     await waitForEvent(a, SERVER_ROOM_STATE);
 
-    b.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    b.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-leave-b',
+    });
     await waitForEvent(b, SERVER_ROOM_STATE);
 
     const update = waitForEvent(a, SERVER_ROOM_STATE);
@@ -199,7 +236,7 @@ describe('RoomGateway (Socket.IO)', () => {
     b.disconnect();
   });
 
-  it('cleans up roster on disconnect', async () => {
+  it('keeps roster during disconnect grace', async () => {
     const room = roomService.createRoom();
 
     const a = connectClient(port);
@@ -210,21 +247,31 @@ describe('RoomGateway (Socket.IO)', () => {
       new Promise<void>((r) => b.once('connect', () => r())),
     ]);
 
-    a.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Stay' });
-    b.emit(CLIENT_REGISTER_NICKNAME, { nickname: 'Drop' });
+    a.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Stay',
+      clientSessionId: 'gw-stay-grace',
+    });
+    b.emit(CLIENT_REGISTER_NICKNAME, {
+      nickname: 'Drop',
+      clientSessionId: 'gw-drop-grace',
+    });
 
-    a.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    a.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-stay-grace',
+    });
     await waitForEvent(a, SERVER_ROOM_STATE);
 
-    b.emit(CLIENT_JOIN_ROOM, { roomId: room.roomId });
+    b.emit(CLIENT_JOIN_ROOM, {
+      roomId: room.roomId,
+      clientSessionId: 'gw-drop-grace',
+    });
     await waitForEvent(b, SERVER_ROOM_STATE);
 
-    const update = waitForEvent(a, SERVER_ROOM_STATE);
     b.disconnect();
     await new Promise((r) => setTimeout(r, 50));
 
-    const afterDrop = RoomStateSchema.parse(await update);
-    expect(afterDrop.players).toHaveLength(1);
+    expect(roomService.getRoomState(room.roomId)!.players).toHaveLength(2);
 
     a.disconnect();
   });

@@ -12,6 +12,7 @@ import { useSessionStore } from './state/sessionStore';
 
 vi.mock('./net/roomSession', () => ({
   establishRoomSession: vi.fn(),
+  reconnectRoomSession: vi.fn(),
 }));
 
 const roomId = '11111111-1111-4111-8111-111111111111';
@@ -82,7 +83,7 @@ describe('TableRoute guard', () => {
   });
 
   it('attempts reconnect once when disconnected', async () => {
-    vi.mocked(roomSession.establishRoomSession).mockResolvedValue({
+    vi.mocked(roomSession.reconnectRoomSession).mockResolvedValue({
       room: {
         roomId,
         code: 'ABC123',
@@ -103,8 +104,8 @@ describe('TableRoute guard', () => {
     renderGuard(`/table/${roomId}`);
 
     await waitFor(() => {
-      expect(roomSession.establishRoomSession).toHaveBeenCalledTimes(1);
-      expect(roomSession.establishRoomSession).toHaveBeenCalledWith(
+      expect(roomSession.reconnectRoomSession).toHaveBeenCalledTimes(1);
+      expect(roomSession.reconnectRoomSession).toHaveBeenCalledWith(
         'alice',
         roomId,
       );

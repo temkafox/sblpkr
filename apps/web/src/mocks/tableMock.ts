@@ -68,6 +68,7 @@ export type SeatStatus =
   | 'post_bb'
   | 'busted'
   | 'sitout'
+  | 'away'
   | 'idle'
   | 'waiting';
 

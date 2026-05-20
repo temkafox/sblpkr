@@ -1,4 +1,5 @@
 export type { Card, Rank, Suit } from './domain/card';
+export { isKnownRank, normalizeRank } from './domain/normalize-rank';
 
 export type { RandomSource } from './domain/random';
 export { createSeededRandom } from './domain/random';
@@ -63,6 +64,7 @@ export {
 
 export type { PotResult, ShowdownResult } from './engine/showdown';
 export {
+  buildShowdownCardPool,
   computeShowdownResult,
   determineShowdownWinners,
   distributePots,
@@ -109,6 +111,8 @@ export {
 export {
   advanceTurnAfterAction,
   canActNow,
+  canContinueBetting,
+  getActorsWhoCanBetSeatIndexes,
   getContestantSeatIndexes,
   getNonFoldedSeatIndexes,
   isBettingRoundComplete,

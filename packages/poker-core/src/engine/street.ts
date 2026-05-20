@@ -7,6 +7,7 @@ import type { PlayerId } from '../domain/seat';
 import type { SeatIndex } from '../domain/seat';
 
 import {
+  canContinueBetting,
   getContestantSeatIndexes,
   isBettingRoundComplete,
   mergeHandPotTotal,
@@ -192,7 +193,7 @@ export function advanceStreet(state: CoreGameState): CoreGameState {
     return foldWinnerTerminal(state);
   }
 
-  if (contenders.every((p) => p.isAllIn)) {
+  if (!canContinueBetting(state)) {
     return dealRunOutToRiver(state);
   }
 

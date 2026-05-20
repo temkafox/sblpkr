@@ -37,6 +37,7 @@ export class GameBroadcastService {
         member.playerId,
       );
       if (seatIndex == null) continue;
+      if (member.socketId == null) continue;
 
       const socket = server.sockets.sockets.get(member.socketId);
       if (socket == null) continue;
@@ -60,11 +61,13 @@ export class GameBroadcastService {
         member.playerId,
       );
       if (seatIndex == null) continue;
+      if (member.socketId == null) continue;
 
       const socket = server.sockets.sockets.get(member.socketId);
       if (socket == null) continue;
 
-      const view = toPlayerGameState(state, seatIndex, room);
+      const handResult = this.resolveHandResult(roomId, state);
+      const view = toPlayerGameState(state, seatIndex, room, handResult);
       socket.emit(SERVER_GAME_STATE, view);
     }
   }
@@ -89,12 +92,19 @@ export class GameBroadcastService {
     client.emit(SERVER_HAND_RESULT, result);
   }
 
-  private resolveHandResult(
+  getHandResultForState(
     roomId: string,
     state: CoreGameState,
   ): HandResultPayload | null {
     const cached = this.tableService.getHandResult(roomId);
     return extractHandResult(state, cached);
+  }
+
+  private resolveHandResult(
+    roomId: string,
+    state: CoreGameState,
+  ): HandResultPayload | null {
+    return this.getHandResultForState(roomId, state);
   }
 
   emitHandHistoryToRoom(server: Server, roomId: string): void {
@@ -136,6 +146,7 @@ export class GameBroadcastService {
         member.playerId,
       );
       if (seatIndex == null) continue;
+      if (member.socketId == null) continue;
 
       const socket = server.sockets.sockets.get(member.socketId);
       if (socket == null) continue;

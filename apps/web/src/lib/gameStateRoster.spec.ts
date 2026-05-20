@@ -12,7 +12,9 @@ const room: RoomStatePayload = {
   code: 'ABC123',
   maxSeats: 9,
   status: 'waiting',
-  players: [{ playerId: 'a', nickname: 'Alice', seatIndex: 0 }],
+  players: [
+    { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
+  ],
 };
 
 const activeHand: PlayerGameState = {
@@ -66,8 +68,8 @@ describe('gameStateRoster', () => {
     const duo: RoomStatePayload = {
       ...room,
       players: [
-        { playerId: 'a', nickname: 'Alice', seatIndex: 0 },
-        { playerId: 'b', nickname: 'Bob', seatIndex: 1 },
+        { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
+        { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
       ],
     };
     expect(gameStateMatchesRoomRoster(activeHand, duo)).toBe(false);

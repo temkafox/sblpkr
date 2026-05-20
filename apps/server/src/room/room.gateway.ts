@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -42,7 +42,7 @@ import { RoomService } from './room.service';
 @WebSocketGateway({
   cors: LOCAL_DEV_SOCKET_CORS,
 })
-export class RoomGateway implements OnGatewayDisconnect {
+export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
   @WebSocketServer()
   server!: Server;
 
@@ -52,11 +52,21 @@ export class RoomGateway implements OnGatewayDisconnect {
     private readonly gameBroadcast: GameBroadcastService,
   ) {}
 
-  handleDisconnect(client: Socket): void {
-    const roomId = this.roomService.handleDisconnect(client.id);
-    if (roomId != null) {
-      void client.leave(roomId);
+  onModuleInit(): void {
+    this.roomService.setGraceExpiredHandler((roomId) => {
       this.afterRoomMembershipChange(roomId);
+    });
+  }
+
+  handleDisconnect(client: Socket): void {
+    const result = this.roomService.handleDisconnect(client.id);
+    if (result.roomId != null) {
+      void client.leave(result.roomId);
+      this.broadcastRoomState(result.roomId);
+      this.broadcastGameStateToRoom(result.roomId);
+      if (result.immediateRosterChange) {
+        this.afterRoomMembershipChange(result.roomId);
+      }
     }
   }
 
@@ -84,6 +94,7 @@ export class RoomGateway implements OnGatewayDisconnect {
 
     await client.join(result.roomId);
     this.broadcastRoomState(result.roomId);
+    this.broadcastGameStateToRoom(result.roomId);
     this.broadcastIdleTableStateIfNoHand(result.roomId);
     this.gameBroadcast.emitHandHistoryToClient(client, result.roomId);
   }
@@ -277,10 +288,11 @@ export class RoomGateway implements OnGatewayDisconnect {
     try {
       const state = this.gameService.getGameState(roomId);
       const room = this.roomService.getRoom(roomId);
+      const handResult = this.gameBroadcast.getHandResultForState(roomId, state);
       const view =
         state.hand == null
           ? toIdlePlayerGameState(state, seatIndex, room)
-          : toPlayerGameState(state, seatIndex, room);
+          : toPlayerGameState(state, seatIndex, room, handResult);
       client.emit(SERVER_GAME_STATE, view);
       this.gameBroadcast.emitHandResultToClient(client, roomId, state);
       this.gameBroadcast.emitHandHistoryToClient(client, roomId);
@@ -299,6 +311,21 @@ export class RoomGateway implements OnGatewayDisconnect {
     const state = this.roomService.getRoomState(roomId);
     if (state == null) return;
     this.server.to(roomId).emit(SERVER_ROOM_STATE, state);
+  }
+
+  /** Pushes per-viewer game snapshots so disconnected seats show AWAY during grace. */
+  private broadcastGameStateToRoom(roomId: string): void {
+    const room = this.roomService.getRoom(roomId);
+    if (room == null || room.players.length === 0) {
+      return;
+    }
+
+    try {
+      const state = this.gameService.getGameState(roomId);
+      this.gameBroadcast.emitGameStateToRoom(this.server, roomId, state);
+    } catch {
+      /* room removed */
+    }
   }
 
   private afterRoomMembershipChange(roomId: string): void {

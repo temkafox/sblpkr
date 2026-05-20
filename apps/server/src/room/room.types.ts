@@ -1,9 +1,20 @@
-import type { RoomPlayer, RoomStatus } from '@neonpoker/shared';
+import type {
+  PlayerId,
+  RoomMemberConnectionStatus,
+  RoomStatus,
+  SeatIndex,
+} from '@neonpoker/shared';
 
 /** Seated member tracked server-side (socket id never leaves the server). */
 
-export type InternalSeatedPlayer = RoomPlayer & {
-  readonly socketId: string;
+export type InternalSeatedPlayer = {
+  playerId: PlayerId;
+  nickname: string;
+  seatIndex: SeatIndex | null;
+  clientSessionId: string;
+  socketId: string | null;
+  connectionStatus: RoomMemberConnectionStatus;
+  disconnectedAt?: number;
 };
 
 /** In-memory room record — mutable `players` while membership changes. */
@@ -20,9 +31,16 @@ export type MutableInternalRoom = {
 
 export type SocketSession = {
   socketId: string;
+  clientSessionId: string;
   nickname: string | null;
   playerId: string | null;
   roomId: string | null;
+};
+
+export type DisconnectResult = {
+  readonly roomId: string | null;
+  /** When true, roster shrank and game reconciliation should run immediately. */
+  readonly immediateRosterChange: boolean;
 };
 
 export type CreateRoomOptions = {

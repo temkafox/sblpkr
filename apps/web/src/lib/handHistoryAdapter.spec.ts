@@ -13,6 +13,7 @@ describe('handHistoryAdapter', () => {
       roomId: 'room-1',
       handId: 'h1',
       handNumber: 1,
+      revision: 1,
       streets: [
         {
           street: 'PRE-FLOP',

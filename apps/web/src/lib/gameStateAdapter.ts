@@ -287,15 +287,32 @@ function seatLabelBet(seat: WireSeatView): number {
   return seat.currentBet;
 }
 
+function seatIsWinner(
+  seat: WireSeatView,
+  winnerSeatIndexes: readonly number[] | undefined,
+): boolean {
+  if (seat.isWinner === true) {
+    return true;
+  }
+  return (
+    winnerSeatIndexes != null &&
+    winnerSeatIndexes.includes(seat.seatIndex)
+  );
+}
+
 /** Maps wire seat + hand context to HUD status token (Phase 7H priority). */
 export function resolveSeatStatus(
   seat: WireSeatView,
   activeSeatIndex: number | null,
   handComplete: boolean,
   hasActiveHand: boolean,
+  winnerSeatIndexes?: readonly number[],
 ): SeatStateMock['status'] {
-  if (handComplete && seat.isWinner) {
+  if (handComplete && seatIsWinner(seat, winnerSeatIndexes)) {
     return 'winner';
+  }
+  if (seat.connectionStatus === 'disconnected') {
+    return 'away';
   }
   if (hasActiveHand && !handComplete && activeSeatIndex === seat.seatIndex) {
     return 'turn';
@@ -312,14 +329,16 @@ export function resolveSeatStatus(
     return 'allin';
   }
 
-  const kind = seat.lastAction?.kind;
-  if (kind === 'raise') return 'raise';
-  if (kind === 'call') return 'call';
-  if (kind === 'check') return 'check';
-  if (kind === 'allin') return 'allin';
-  if (kind === 'fold') return 'fold';
-  if (kind === 'post_sb') return 'post_sb';
-  if (kind === 'post_bb') return 'post_bb';
+  if (hasActiveHand && !handComplete) {
+    const kind = seat.lastAction?.kind;
+    if (kind === 'raise') return 'raise';
+    if (kind === 'call') return 'call';
+    if (kind === 'check') return 'check';
+    if (kind === 'allin') return 'allin';
+    if (kind === 'fold') return 'fold';
+    if (kind === 'post_sb') return 'post_sb';
+    if (kind === 'post_bb') return 'post_bb';
+  }
 
   if (handComplete) {
     if (seat.isSittingOut) return 'sitout';
@@ -424,8 +443,8 @@ export function adaptRoomLobbyState(
     avatar: layoutIdx === 0 ? '/assets/avatar-1.png' : null,
   }));
 
-  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map(() => ({
-    status: 'waiting' as const,
+  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map((member) => ({
+    status: member.connectionStatus === 'disconnected' ? 'away' : 'waiting',
     bet: 0,
     amount: '',
     showOppBackcards: false,
@@ -516,6 +535,7 @@ export function adaptPlayerGameState(
         state.activeSeatIndex,
         state.handComplete,
         true,
+        state.winnerSeatIndexes,
       ),
       bet: seatLabelBet(seat),
       amount: seatLabelBet(seat) > 0 ? seatLabelBet(seat) : '',

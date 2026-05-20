@@ -42,11 +42,14 @@ const STREET_ORDER: readonly Street[] = [
 
 type StoredEntry = HandHistoryEntry;
 
+const MAX_HISTORY_ENTRIES = 200;
+
 type RoomHandHistory = {
   handId: string | null;
   handNumber: number;
   entries: StoredEntry[];
   nextSeq: number;
+  revision: number;
 };
 
 @Injectable()
@@ -64,6 +67,7 @@ export class HandHistoryService {
         roomId,
         handId: null,
         handNumber: 0,
+        revision: 0,
         streets: [],
       };
     }
@@ -72,6 +76,7 @@ export class HandHistoryService {
       roomId,
       handId: room.handId,
       handNumber: room.handNumber,
+      revision: room.revision,
       streets: groupEntriesByStreet(room.entries),
     };
   }
@@ -207,6 +212,7 @@ export class HandHistoryService {
         handNumber: 0,
         entries: [],
         nextSeq: 0,
+        revision: 0,
       };
       this.byRoom.set(roomId, store);
     }
@@ -262,31 +268,33 @@ export class HandHistoryService {
     showdownResult: ShowdownResult | null,
     isFoldWin: boolean,
   ): void {
-    if (showdownResult != null) {
-      const awards = aggregateAwards(showdownResult);
-      for (const [seatKey, amount] of Object.entries(awards)) {
-        if (amount <= 0) continue;
-        const seatIndex = Number(seatKey);
+    if (showdownResult == null) {
+      if (!isFoldWin) {
+        return;
+      }
+      for (const seatIndex of getNonFoldedSeatIndexes(state)) {
         const nickname = nicknameForSeat(room, seatIndex);
         const cls = colorForSeat(seatIndex);
-        const suffix = isFoldWin ? ' wins' : ' wins';
-        this.push(store, 'SHOWDOWN', `${nickname}${suffix} $${amount}`, {
+        this.push(store, 'SHOWDOWN', `${nickname} wins`, {
           nickname,
           nameColor: cls,
           actionKind: 'winner',
-          amount,
         });
       }
       return;
     }
 
-    for (const seatIndex of getNonFoldedSeatIndexes(state)) {
+    const awards = aggregateAwards(showdownResult);
+    for (const [seatKey, amount] of Object.entries(awards)) {
+      if (amount <= 0) continue;
+      const seatIndex = Number(seatKey);
       const nickname = nicknameForSeat(room, seatIndex);
       const cls = colorForSeat(seatIndex);
-      this.push(store, 'SHOWDOWN', `${nickname} wins`, {
+      this.push(store, 'SHOWDOWN', `${nickname} wins $${amount}`, {
         nickname,
         nameColor: cls,
         actionKind: 'winner',
+        amount,
       });
     }
   }
@@ -305,6 +313,16 @@ export class HandHistoryService {
         ...meta,
       }),
     );
+    store.revision += 1;
+    this.trimEntries(store);
+  }
+
+  private trimEntries(store: RoomHandHistory): void {
+    if (store.entries.length <= MAX_HISTORY_ENTRIES) {
+      return;
+    }
+    store.entries = store.entries.slice(-MAX_HISTORY_ENTRIES);
+    store.revision += 1;
   }
 }
 

@@ -15,6 +15,8 @@ function heroStateClass(status: SeatStateMock['status']) {
       return 'state-allin';
     case 'winner':
       return 'state-winner';
+    case 'away':
+      return 'state-away';
     default:
       return '';
   }
@@ -38,7 +40,8 @@ function heroStatusClass(status: SeatStateMock['status']) {
       return 't-winner';
     case 'sitout':
     case 'busted':
-      return 't-sitout';
+    case 'away':
+      return 't-away';
     case 'post_sb':
     case 'post_bb':
       return 't-check';
@@ -67,6 +70,8 @@ function heroStatusText(st: SeatStateMock): string {
       return 'SITTING OUT';
     case 'busted':
       return 'BUSTED';
+    case 'away':
+      return 'AWAY';
     case 'post_sb':
       return st.bet ? `SB $${formatChips(st.bet)}` : 'SB';
     case 'post_bb':

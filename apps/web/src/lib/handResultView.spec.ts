@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import type { HandResultPayload } from '@neonpoker/shared';
+import type { HandResultPayload, RoomStatePayload } from '@neonpoker/shared';
 
 import {
   buildHandResultWinnerLines,
   handResultHeadline,
 } from './handResultView';
 
-const room = {
+const room: RoomStatePayload = {
   roomId: 'room-1',
   code: 'ABC',
   maxSeats: 9,
-  status: 'waiting' as const,
+  status: 'waiting',
   players: [
-    { playerId: 'a', nickname: 'Alice', seatIndex: 0 },
-    { playerId: 'b', nickname: 'Bob', seatIndex: 1 },
+    { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
+    { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
   ],
 };
 

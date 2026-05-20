@@ -67,6 +67,7 @@ export const HandHistoryPayloadSchema = z
     roomId: z.string().min(1),
     handId: z.string().nullable(),
     handNumber: z.number().int().nonnegative(),
+    revision: z.number().int().nonnegative(),
     streets: z.array(HandHistoryStreetSectionSchema),
   })
   .strict();

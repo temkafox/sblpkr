@@ -9,8 +9,8 @@ const room: RoomStatePayload = {
   maxSeats: 9,
   status: 'waiting',
   players: [
-    { playerId: 'a', nickname: 'Alice', seatIndex: 0 },
-    { playerId: 'b', nickname: 'Bob', seatIndex: 1 },
+    { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
+    { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
   ],
 };
 

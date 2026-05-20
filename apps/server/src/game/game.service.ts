@@ -210,7 +210,7 @@ export class GameService {
     const before = state;
     state = applyAction(state, seatIndex, coreAction);
     this.handHistory.onPlayerAction(room, state, seatIndex, action);
-    const progressed = progressGameState(state);
+    const progressed = progressGameState(state, room);
     state = progressed.state;
     this.handHistory.onProgress(
       room,
@@ -236,7 +236,7 @@ export class GameService {
   progressAfterAction(roomId: string): CoreGameState {
     const room = this.requireRoom(roomId);
     const before = this.getGameState(roomId);
-    const progressed = progressGameState(before);
+    const progressed = progressGameState(before, room);
     const state = progressed.state;
     this.handHistory.onProgress(
       room,
@@ -292,7 +292,7 @@ export class GameService {
     state = syncTableToRoom(room, state);
 
     const before = state;
-    const progressed = progressGameState(state);
+    const progressed = progressGameState(state, room);
     state = progressed.state;
     this.handHistory.onProgress(
       room,

@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   CreateRoomOptions,
+  DisconnectResult,
   InternalSeatedPlayer,
   LeaveRoomResult,
   MutableInternalRoom,
@@ -26,6 +27,9 @@ import type {
 } from './room.types';
 
 const DEFAULT_MAX_SEATS = 9 as const;
+
+/** Grace period before a refresh disconnect is treated as a leave. */
+export const DISCONNECT_GRACE_MS = 60_000;
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -45,18 +49,34 @@ export class RoomService {
   private readonly byId = new Map<RoomId, MutableInternalRoom>();
   private readonly idByCode = new Map<RoomCode, RoomId>();
   private readonly sessions = new Map<string, SocketSession>();
+  private readonly playerIdByClientSession = new Map<string, string>();
+  private readonly disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   private generateCode: RoomCodeGenerator = defaultCodeGenerator;
   private generateId: RoomIdGenerator = defaultIdGenerator;
+  private gracePeriodMs = DISCONNECT_GRACE_MS;
+  private onGraceExpired: ((roomId: string) => void) | null = null;
 
   static forTest(options?: {
     readonly code?: RoomCodeGenerator;
     readonly id?: RoomIdGenerator;
+    readonly gracePeriodMs?: number;
+    readonly onGraceExpired?: (roomId: string) => void;
   }): RoomService {
     const svc = new RoomService();
     if (options?.code) svc.generateCode = options.code;
     if (options?.id) svc.generateId = options.id;
+    if (options?.gracePeriodMs != null) {
+      svc.gracePeriodMs = options.gracePeriodMs;
+    }
+    if (options?.onGraceExpired) {
+      svc.onGraceExpired = options.onGraceExpired;
+    }
     return svc;
+  }
+
+  setGraceExpiredHandler(handler: (roomId: string) => void): void {
+    this.onGraceExpired = handler;
   }
 
   createRoom(options: CreateRoomOptions = {}): CreateRoomResponse {
@@ -148,19 +168,23 @@ export class RoomService {
       return { ok: false, code: 'INVALID_PAYLOAD', message };
     }
 
-    const nickname = parsed.data.nickname;
+    const { nickname, clientSessionId } = parsed.data;
     const existing = this.sessions.get(socketId);
 
-    if (existing?.nickname === nickname && existing.playerId != null) {
-      return { ok: true, playerId: existing.playerId, nickname };
+    let playerId = this.playerIdByClientSession.get(clientSessionId);
+    if (playerId == null) {
+      playerId = randomUUID();
+      this.playerIdByClientSession.set(clientSessionId, playerId);
     }
 
-    const playerId = randomUUID();
+    const priorRoomId = this.findRoomIdForClientSession(clientSessionId);
+
     this.sessions.set(socketId, {
       socketId,
+      clientSessionId,
       nickname,
       playerId,
-      roomId: existing?.roomId ?? null,
+      roomId: existing?.roomId ?? priorRoomId,
     });
 
     return { ok: true, playerId, nickname };
@@ -185,9 +209,46 @@ export class RoomService {
       };
     }
 
+    const clientSessionId = parsed.data.clientSessionId;
+    if (clientSessionId !== session.clientSessionId) {
+      return {
+        ok: false,
+        code: 'INVALID_PAYLOAD',
+        message: 'Client session id does not match registration',
+      };
+    }
+
     const roomId = this.resolveRoomId(parsed.data.roomId);
     if (roomId == null) {
       return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found' };
+    }
+
+    const room = this.byId.get(roomId)!;
+    const existing = room.players.find(
+      (p) => p.clientSessionId === clientSessionId,
+    );
+
+    if (existing != null) {
+      if (session.roomId === roomId && existing.socketId === socketId) {
+        return {
+          ok: false,
+          code: 'ALREADY_JOINED',
+          message: 'Socket already joined this room',
+        };
+      }
+
+      this.cancelDisconnectGrace(roomId, clientSessionId);
+      existing.socketId = socketId;
+      existing.connectionStatus = 'connected';
+      existing.disconnectedAt = undefined;
+      existing.nickname = session.nickname;
+
+      if (session.roomId != null && session.roomId !== roomId) {
+        this.removePlayerFromRoom(session.roomId, clientSessionId);
+      }
+
+      this.sessions.set(socketId, { ...session, roomId });
+      return { ok: true, roomId };
     }
 
     if (session.roomId === roomId) {
@@ -198,9 +259,7 @@ export class RoomService {
       };
     }
 
-    const room = this.byId.get(roomId)!;
-
-    if (this.nicknameTakenInRoom(room, session.nickname, socketId)) {
+    if (this.nicknameTakenInRoom(room, session.nickname, clientSessionId)) {
       return {
         ok: false,
         code: 'NICKNAME_TAKEN',
@@ -213,14 +272,16 @@ export class RoomService {
     }
 
     if (session.roomId != null) {
-      this.removePlayerFromRoom(session.roomId, socketId);
+      this.removePlayerFromRoom(session.roomId, clientSessionId);
     }
 
     const seated: InternalSeatedPlayer = {
       playerId: session.playerId,
       nickname: session.nickname,
       seatIndex: room.players.length,
+      clientSessionId,
       socketId,
+      connectionStatus: 'connected',
     };
 
     room.players.push(seated);
@@ -257,7 +318,9 @@ export class RoomService {
       return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found' };
     }
 
-    this.removePlayerFromRoom(targetRoomId, socketId);
+    if (session?.clientSessionId != null) {
+      this.removePlayerFromRoom(targetRoomId, session.clientSessionId);
+    }
 
     if (session != null) {
       this.sessions.set(socketId, { ...session, roomId: null });
@@ -266,19 +329,36 @@ export class RoomService {
     return { ok: true, roomId: targetRoomId };
   }
 
-  /** Removes socket from its current room; returns room id to broadcast, if any. */
+  /** Marks disconnect; roster removal is deferred until grace expires. */
 
-  handleDisconnect(socketId: string): string | null {
+  handleDisconnect(socketId: string): DisconnectResult {
     const session = this.sessions.get(socketId);
-    if (session == null) return null;
-
-    const roomId = session.roomId;
-    if (roomId != null) {
-      this.removePlayerFromRoom(roomId, socketId);
+    if (session == null) {
+      return { roomId: null, immediateRosterChange: false };
     }
 
+    const roomId = session.roomId;
     this.sessions.delete(socketId);
-    return roomId;
+
+    if (roomId == null) {
+      return { roomId: null, immediateRosterChange: false };
+    }
+
+    const room = this.byId.get(roomId);
+    const player = room?.players.find(
+      (p) => p.clientSessionId === session.clientSessionId,
+    );
+
+    if (player == null) {
+      return { roomId, immediateRosterChange: true };
+    }
+
+    player.socketId = null;
+    player.connectionStatus = 'disconnected';
+    player.disconnectedAt = Date.now();
+    this.scheduleDisconnectGrace(roomId, session.clientSessionId);
+
+    return { roomId, immediateRosterChange: false };
   }
 
   deleteRoom(roomId: RoomId): boolean {
@@ -286,9 +366,12 @@ export class RoomService {
     if (room == null) return false;
 
     for (const player of room.players) {
-      const session = this.sessions.get(player.socketId);
-      if (session != null) {
-        this.sessions.set(player.socketId, { ...session, roomId: null });
+      this.cancelDisconnectGrace(roomId, player.clientSessionId);
+      if (player.socketId != null) {
+        const session = this.sessions.get(player.socketId);
+        if (session != null) {
+          this.sessions.set(player.socketId, { ...session, roomId: null });
+        }
       }
     }
 
@@ -297,23 +380,98 @@ export class RoomService {
     return true;
   }
 
+  private findRoomIdForClientSession(
+    clientSessionId: string,
+  ): string | null {
+    for (const room of this.byId.values()) {
+      if (room.players.some((p) => p.clientSessionId === clientSessionId)) {
+        return room.roomId;
+      }
+    }
+    return null;
+  }
+
+  private graceKey(roomId: string, clientSessionId: string): string {
+    return `${roomId}:${clientSessionId}`;
+  }
+
+  private scheduleDisconnectGrace(
+    roomId: string,
+    clientSessionId: string,
+  ): void {
+    const key = this.graceKey(roomId, clientSessionId);
+    const prior = this.disconnectTimers.get(key);
+    if (prior != null) {
+      clearTimeout(prior);
+    }
+
+    const timer = setTimeout(() => {
+      this.disconnectTimers.delete(key);
+      this.finalizeDisconnect(roomId, clientSessionId);
+    }, this.gracePeriodMs);
+
+    this.disconnectTimers.set(key, timer);
+  }
+
+  private cancelDisconnectGrace(
+    roomId: string,
+    clientSessionId: string,
+  ): void {
+    const key = this.graceKey(roomId, clientSessionId);
+    const timer = this.disconnectTimers.get(key);
+    if (timer != null) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(key);
+    }
+  }
+
+  private finalizeDisconnect(roomId: string, clientSessionId: string): void {
+    const room = this.byId.get(roomId);
+    if (room == null) return;
+
+    const player = room.players.find(
+      (p) =>
+        p.clientSessionId === clientSessionId &&
+        p.socketId == null &&
+        p.disconnectedAt != null,
+    );
+    if (player == null) {
+      return;
+    }
+
+    this.removePlayerFromRoom(roomId, clientSessionId);
+    this.onGraceExpired?.(roomId);
+  }
+
   private nicknameTakenInRoom(
     room: MutableInternalRoom,
     nickname: string,
-    socketId: string,
+    clientSessionId: string,
   ): boolean {
     const key = nickname.toLowerCase();
     return room.players.some(
       (p) =>
-        p.socketId !== socketId && p.nickname.toLowerCase() === key,
+        p.clientSessionId !== clientSessionId &&
+        p.nickname.toLowerCase() === key,
     );
   }
 
-  private removePlayerFromRoom(roomId: RoomId, socketId: string): void {
+  private removePlayerFromRoom(
+    roomId: RoomId,
+    clientSessionId: string,
+  ): void {
     const room = this.byId.get(roomId);
     if (room == null) return;
 
-    room.players = room.players.filter((p) => p.socketId !== socketId);
+    this.cancelDisconnectGrace(roomId, clientSessionId);
+
+    room.players = room.players.filter(
+      (p) => p.clientSessionId !== clientSessionId,
+    );
+
+    for (let i = 0; i < room.players.length; i++) {
+      room.players[i]!.seatIndex = i;
+    }
 
     if (
       room.hostPlayerId != null &&
@@ -344,6 +502,7 @@ export class RoomService {
             playerId: p.playerId,
             nickname: p.nickname,
             seatIndex: p.seatIndex,
+            connectionStatus: p.connectionStatus,
           }),
         ),
       ),

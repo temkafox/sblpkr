@@ -23,6 +23,7 @@ describe('RegisterNicknamePayloadSchema', () => {
   it('accepts valid nicknames', () => {
     const parsed = RegisterNicknamePayloadSchema.parse({
       nickname: 'Neo_Player',
+      clientSessionId: 'browser-session-1',
       protocolVersion: PROTOCOL_VERSION,
     });
     expect(parsed.nickname).toBe('Neo_Player');
@@ -31,6 +32,7 @@ describe('RegisterNicknamePayloadSchema', () => {
   it('trims nickname', () => {
     const parsed = RegisterNicknamePayloadSchema.parse({
       nickname: '  valid_name  ',
+      clientSessionId: 'browser-session-2',
     });
     expect(parsed.nickname).toBe('valid_name');
   });
@@ -51,7 +53,10 @@ describe('RegisterNicknamePayloadSchema', () => {
 describe('JoinRoomPayloadSchema', () => {
   it('requires non-empty trimmed room id', () => {
     expect(() =>
-      JoinRoomPayloadSchema.parse({ roomId: 'ROOM1234' }),
+      JoinRoomPayloadSchema.parse({
+        roomId: 'ROOM1234',
+        clientSessionId: 'browser-session-3',
+      }),
     ).not.toThrow();
     expect(() => JoinRoomPayloadSchema.parse({ roomId: '' })).toThrow();
     expect(() => JoinRoomPayloadSchema.parse({ roomId: '   ' })).toThrow();
@@ -100,6 +105,7 @@ describe('HandHistoryPayloadSchema', () => {
       roomId: 'room-1',
       handId: 'hand-1',
       handNumber: 1,
+      revision: 0,
       streets: [
         {
           street: 'PRE-FLOP',
@@ -122,6 +128,7 @@ describe('HandHistoryPayloadSchema', () => {
         roomId: 'room-1',
         handId: 'hand-1',
         handNumber: 1,
+        revision: 0,
         streets: [],
         deck: [],
       }),
@@ -252,7 +259,7 @@ describe('REST room schemas (Phase 6A)', () => {
       maxSeats: 9,
       status: 'waiting',
       players: [
-        { playerId: 'p1', nickname: 'Neo', seatIndex: null },
+        { playerId: 'p1', nickname: 'Neo', seatIndex: null, connectionStatus: 'connected' },
       ],
     });
     expect(parsed.players).toHaveLength(1);

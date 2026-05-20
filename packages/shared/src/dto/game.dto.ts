@@ -81,6 +81,7 @@ export const WireSeatViewSchema = z.object({
   holeCardCount: z.number().int().nonnegative().nullable(),
   lastAction: PublicSeatActionSchema.nullable().optional(),
   isWinner: z.boolean().optional(),
+  connectionStatus: z.enum(['connected', 'disconnected']).optional(),
 });
 
 export const PublicGameStateSchema = z.object({

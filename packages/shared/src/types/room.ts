@@ -4,10 +4,13 @@ export type RoomId = string;
 
 export type RoomCode = string;
 
+export type RoomMemberConnectionStatus = 'connected' | 'disconnected';
+
 export type RoomPlayer = {
   readonly playerId: PlayerId;
   readonly nickname: string;
   readonly seatIndex: SeatIndex | null;
+  readonly connectionStatus: RoomMemberConnectionStatus;
 };
 
 export type RoomStatus = 'waiting' | 'playing' | 'closed';

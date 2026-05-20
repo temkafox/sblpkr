@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 
 import { TablePage } from '../pages/TablePage/TablePage';
-import { establishRoomSession } from '../net/roomSession';
+import { reconnectRoomSession } from '../net/roomSession';
 import { useRoomStore } from '../state/roomStore';
 import { useSessionStore } from '../state/sessionStore';
 
@@ -36,7 +36,7 @@ export function TableRoute() {
 
     reconnectKeys.add(reconnectKey);
 
-    void establishRoomSession(nick, roomId).catch(() => {
+    void reconnectRoomSession(nick, roomId).catch(() => {
       /* errors surface via roomStore; table keeps static mock UI */
     });
   }, [roomId, nickname]);

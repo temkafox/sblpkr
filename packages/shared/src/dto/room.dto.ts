@@ -58,6 +58,12 @@ export type GetRoomResponse = {
 
 /** Matches Phase 1D nickname rules — duplicate enforcement stays server-side. */
 
+export const ClientSessionIdSchema = z
+  .string()
+  .trim()
+  .min(1, 'Client session id is required')
+  .max(64, 'Client session id must be at most 64 characters');
+
 export const RegisterNicknamePayloadSchema = z.object({
   nickname: z
     .string()
@@ -68,6 +74,7 @@ export const RegisterNicknamePayloadSchema = z.object({
       /^[a-zA-Z0-9_-]+$/,
       'Nickname may contain letters, numbers, underscore, or hyphen only',
     ),
+  clientSessionId: ClientSessionIdSchema,
   protocolVersion: z.literal(PROTOCOL_VERSION).optional(),
 });
 
@@ -77,6 +84,7 @@ export type RegisterNicknamePayload = z.infer<
 
 export const JoinRoomPayloadSchema = z.object({
   roomId: z.string().trim().min(1).max(128),
+  clientSessionId: ClientSessionIdSchema,
 });
 
 export type JoinRoomPayload = z.infer<typeof JoinRoomPayloadSchema>;
@@ -87,10 +95,16 @@ export const LeaveRoomPayloadSchema = z.object({
 
 export type LeaveRoomPayload = z.infer<typeof LeaveRoomPayloadSchema>;
 
+export const RoomMemberConnectionStatusSchema = z.enum([
+  'connected',
+  'disconnected',
+]);
+
 const RoomPlayerSchema = z.object({
   playerId: z.string().min(1),
   nickname: z.string().min(1),
   seatIndex: z.number().int().nonnegative().nullable(),
+  connectionStatus: RoomMemberConnectionStatusSchema,
 });
 
 /** Wire snapshot broadcast on `SERVER_ROOM_STATE` (Phase 6B). */
