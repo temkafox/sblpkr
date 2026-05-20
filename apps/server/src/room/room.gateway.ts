@@ -28,11 +28,12 @@ import { GameBroadcastService } from '../game/game-broadcast';
 import { GameService } from '../game/game.service';
 import { mapToSocketErrorCode } from '../game/poker-core-error-map';
 import { toPlayerGameState } from '../game/game-state-view';
+import { LOCAL_DEV_SOCKET_CORS } from '../cors.config';
 import { RoomService } from './room.service';
 
 @Injectable()
 @WebSocketGateway({
-  cors: { origin: true },
+  cors: LOCAL_DEV_SOCKET_CORS,
 })
 export class RoomGateway implements OnGatewayDisconnect {
   @WebSocketServer()
