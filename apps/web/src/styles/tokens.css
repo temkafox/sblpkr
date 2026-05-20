@@ -1,0 +1,71 @@
+/* ============================================================
+   NEONPOKER — Design Tokens
+   Neon cyberpunk Texas Hold'em — desktop 1920x1080
+   ============================================================ */
+
+:root {
+  /* --- Color: Background / Surfaces --- */
+  --bg-0:           #05030d;
+  --bg-1:           #0a0617;
+  --bg-2:           #110a22;
+
+  --surface-glass:  rgba(10, 6, 26, 0.72);
+  --surface-glass-2:rgba(18, 10, 36, 0.78);
+  --surface-solid:  #0c0820;
+
+  /* --- Color: Neons --- */
+  --neon-cyan:      #22d3ff;
+  --neon-blue:      #2a6fff;
+  --neon-violet:    #8b5cff;
+  --neon-magenta:   #ff3df0;
+  --neon-pink:      #ff4d8a;
+  --neon-green:     #2bff9b;
+  --neon-amber:     #ffb43d;
+
+  /* --- Color: Text --- */
+  --text-hi:        #f3eaff;
+  --text-md:        #c6b9e3;
+  --text-lo:        #7a6fa3;
+  --text-mute:      #4a4566;
+
+  /* --- Color: Semantic --- */
+  --danger:         #ff2e6b;
+  --warn:           #ffb43d;
+  --ok:             #2bff9b;
+  --primary:        var(--neon-cyan);
+
+  /* --- Borders --- */
+  --border-hairline: 1px solid rgba(139, 92, 255, 0.18);
+  --border-soft:     1px solid rgba(139, 92, 255, 0.28);
+  --border-strong:   1px solid rgba(34, 211, 255, 0.55);
+
+  /* --- Radii --- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* --- Spacing (4px grid) --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+
+  /* --- Glows --- */
+  --glow-cyan:    0 0 14px rgba(34,211,255,.55), 0 0 36px rgba(34,211,255,.28);
+  --glow-violet:  0 0 14px rgba(139,92,255,.55), 0 0 36px rgba(139,92,255,.28);
+  --glow-magenta: 0 0 14px rgba(255,61,240,.55), 0 0 36px rgba(255,61,240,.28);
+  --glow-pink:    0 0 14px rgba(255,46,107,.55), 0 0 36px rgba(255,46,107,.28);
+  --glow-green:   0 0 14px rgba(43,255,155,.55), 0 0 36px rgba(43,255,155,.28);
+
+  /* --- Type --- */
+  --font-display: 'Orbitron', 'Rajdhani', system-ui, sans-serif;
+  --font-ui:      'Rajdhani', 'Inter', system-ui, sans-serif;
+  --font-num:     'JetBrains Mono', 'Rajdhani', monospace;
+}

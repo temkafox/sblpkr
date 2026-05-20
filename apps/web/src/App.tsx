@@ -1,22 +1,18 @@
-import type { HealthStatus } from '@neonpoker/shared';
-
-const health: HealthStatus = 'ok';
+import { Background } from './components/layout/Background';
+import { Logo } from './components/layout/Logo';
+import { Stage } from './components/layout/Stage';
+import { StageScaler } from './components/layout/StageScaler';
 
 export function App() {
   return (
-    <main
-      style={{
-        margin: 0,
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        fontFamily: 'system-ui, sans-serif',
-        background: '#0a061a',
-        color: '#22d3ff',
-      }}
-    >
-      <h1>NEONPOKER Web</h1>
-      <p style={{ color: '#7a6fa3', fontSize: '0.875rem' }}>shared stub: {health}</p>
-    </main>
+    <StageScaler>
+      <Stage>
+        <Background />
+        <Logo />
+        <div className="phase1a-placeholder">
+          <div>Phase 1A UI foundation ready</div>
+        </div>
+      </Stage>
+    </StageScaler>
   );
 }
