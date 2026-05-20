@@ -80,3 +80,16 @@ export {
   isBettingRoundComplete,
   needsToAct,
 } from './engine/betting-round';
+
+export type { SeatChipSlice, SidePot } from '@neonpoker/shared';
+
+export type { SidePotBreakdown } from './engine/side-pots';
+
+export {
+  calculateSidePotBreakdown,
+  calculateSidePots,
+  getContributorSeatIndexesForLevel,
+  getEligibleSeatIndexesForLevel,
+  getTotalCommitted,
+  syncPotsFromCommitments,
+} from './engine/side-pots';

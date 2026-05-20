@@ -75,6 +75,16 @@ Path aliases in `tsconfig.base.json` point at package entry barrels only. Public
 
 Poker rules are implemented in `packages/poker-core`, not in React.
 
+### Phase 4D1 — Side pot accounting (`poker-core`)
+
+Side-pot math splits chip flows into **contested pots** vs **true uncalled tails**:
+
+- **Contested slices** (`calculateSidePotBreakdown().contestedSidePots`): layered from matched `totalCommitted` thresholds; each slice lists **non-folded** eligible seats only.
+- **Uncalled / unmatched excess** (`returnableUncalledBySeatIndex` on breakdown and optionally `pots.returnableUncalled` after `syncPotsFromCommitments`): inferred only in **heads-up chip geometry** — when **at most two players** have `totalCommitted > 0`. Then the deeper stack’s tail above the shorter (`max − shorter`) is modeled as returnable (excluding blind-only HU posting). With three or more contributors (even if only one player remains eligible), staggered stacks are expressed purely via contested layering plus dead-money audit fields — never as silent refunds carved out by a misleading global `max − second`.
+- **Dead money from folded-only layers**: if a contribution tier has **contributors but zero eligible survivors**, those chips are **not** modeled as refunds to anyone; they accumulate and merge into the **last contested** slice with an explicit audit counter **`deadMoneyMergedIntoLastContestedPot`** so the merge is visible (distinct from uncalled refunds).
+
+If action sequencing is correct, uncalled tails should usually already live in stack semantics elsewhere; this breakdown still guarantees **`Σ contested + Σ returnable === Σ totalCommitted`** on the snapshot.
+
 ## Design handoff
 
 `/design` contains HTML/CSS/JSX reference files, assets, exports, and spec docs (`design/docs/`). Phase 1 copies tokens and components into `apps/web`; the `/design` folder itself stays unchanged as reference.
