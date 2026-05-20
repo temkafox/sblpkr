@@ -18,6 +18,12 @@
   z-index: 25;
 }
 
+.np-action-bar--disabled {
+  opacity: 0.42;
+  filter: grayscale(0.35);
+  pointer-events: none;
+}
+
 .np-action-bar::before {
   content: '';
   position: absolute;

@@ -1,4 +1,8 @@
-import type { PlayerGameState, WireSeatView } from '@neonpoker/shared';
+import type {
+  PlayerGameState,
+  RoomStatePayload,
+  WireSeatView,
+} from '@neonpoker/shared';
 
 import { LAYOUTS, type SeatCount } from './layout';
 import type {
@@ -15,7 +19,43 @@ import type {
 /** Table view derived from server PlayerGameState (viewer always at layout seat 0). */
 export type AdaptedTableView = Omit<TablePageMock, 'heroHoleCards'> & {
   heroHoleCards: [CardModel, CardModel] | null;
+  /** `waiting` = room roster only; `hand` = active hand UI (board, badges, actions). */
+  phase: 'waiting' | 'hand';
 };
+
+/** Seat index sentinel — no D/SB/BB/active badges render in waiting phase. */
+export const NO_HAND_SEAT_INDEX = -1;
+
+export function isActiveHand(
+  state: PlayerGameState | null | undefined,
+): boolean {
+  return state?.handId != null && state.handId.length > 0;
+}
+
+function preHandMockGameState(preset: SeatCount): MockGameState {
+  return {
+    seats: preset,
+    dealerSeatIndex: NO_HAND_SEAT_INDEX,
+    smallBlindSeatIndex: NO_HAND_SEAT_INDEX,
+    bigBlindSeatIndex: NO_HAND_SEAT_INDEX,
+    activeSeatIndex: NO_HAND_SEAT_INDEX,
+  };
+}
+
+function stacksByPlayerId(
+  state: PlayerGameState | null | undefined,
+): ReadonlyMap<string, number> {
+  const map = new Map<string, number>();
+  if (state == null) return map;
+  for (const seat of state.seats) {
+    if (seat.playerId != null) {
+      map.set(seat.playerId, seat.stack);
+    }
+  }
+  return map;
+}
+
+const LOBBY_PLACEHOLDER_STACK = 200;
 
 const RINGS: readonly PlayerRing[] = [
   'cyan',
@@ -26,14 +66,18 @@ const RINGS: readonly PlayerRing[] = [
   'amber',
 ];
 
-const EMPTY_PLAYER: PlayerMock = {
-  id: '__empty__',
-  name: '',
-  stack: 0,
-  ring: 'violet',
-  init: '',
-  avatar: null,
-};
+/** Layout preset bucket from occupied (seated) player count. */
+export function occupiedCountToLayoutPreset(occupiedCount: number): SeatCount {
+  if (occupiedCount <= 2) return 2;
+  if (occupiedCount <= 4) return 4;
+  if (occupiedCount <= 6) return 6;
+  return 9;
+}
+
+/** @deprecated Use {@link occupiedCountToLayoutPreset} for live server state. */
+export function toSeatCount(maxSeats: number): SeatCount {
+  return occupiedCountToLayoutPreset(maxSeats);
+}
 
 export function boardRevealFromStreet(
   street: PlayerGameState['street'],
@@ -54,14 +98,38 @@ export function boardRevealFromStreet(
   }
 }
 
-export function toSeatCount(maxSeats: number): SeatCount {
-  if (maxSeats === 2 || maxSeats === 4 || maxSeats === 6 || maxSeats === 9) {
-    return maxSeats;
+export function resolveSeatNickname(
+  seat: Pick<WireSeatView, 'playerId' | 'nickname'>,
+  room: RoomStatePayload | null,
+): string | null {
+  const wire = seat.nickname?.trim();
+  if (wire) return wire;
+  if (seat.playerId == null || room == null) return null;
+  const member = room.players.find((p) => p.playerId === seat.playerId);
+  if (member?.nickname?.trim()) return member.nickname.trim();
+  return null;
+}
+
+export function orderRoomPlayersForViewer<
+  T extends { playerId: string; nickname: string },
+>(players: readonly T[], viewerNickname: string | null): T[] {
+  if (players.length === 0) return [];
+
+  const nick = viewerNickname?.trim().toLowerCase();
+  let viewerIdx = 0;
+  if (nick) {
+    const found = players.findIndex(
+      (p) => p.nickname.trim().toLowerCase() === nick,
+    );
+    if (found >= 0) viewerIdx = found;
   }
-  if (maxSeats <= 2) return 2;
-  if (maxSeats <= 4) return 4;
-  if (maxSeats <= 6) return 6;
-  return 9;
+
+  const viewer = players[viewerIdx]!;
+  const others = players
+    .filter((_, i) => i !== viewerIdx)
+    .sort((a, b) => a.nickname.localeCompare(b.nickname));
+
+  return [viewer, ...others];
 }
 
 export function findViewerSeatIndex(
@@ -85,18 +153,28 @@ export function findViewerSeatIndex(
   return occupied >= 0 ? occupied : 0;
 }
 
-function rotate<T>(items: readonly T[], pivot: number): T[] {
-  const n = items.length;
-  return Array.from({ length: n }, (_, layoutIdx) => items[(pivot + layoutIdx) % n]!);
+/** Viewer first, then other occupied seats in server seat order. */
+export function orderOccupiedSeatsForViewer(
+  seats: readonly WireSeatView[],
+  viewerIndexInArray: number,
+): WireSeatView[] {
+  const occupied = seats.filter((s) => s.playerId != null);
+  const viewer = seats[viewerIndexInArray];
+  if (viewer?.playerId == null) {
+    return [...occupied].sort((a, b) => a.seatIndex - b.seatIndex);
+  }
+  const others = occupied
+    .filter((s) => s.seatIndex !== viewer.seatIndex)
+    .sort((a, b) => a.seatIndex - b.seatIndex);
+  return [viewer, ...others];
 }
 
-export function remapSeatIndex(
+export function remapServerSeatToLayout(
   serverIdx: number | null,
-  pivot: number,
-  seatCount: number,
+  serverToLayout: ReadonlyMap<number, number>,
 ): number {
   if (serverIdx == null) return 0;
-  return (serverIdx - pivot + seatCount) % seatCount;
+  return serverToLayout.get(serverIdx) ?? 0;
 }
 
 export function shouldShowOppBackcards(
@@ -112,12 +190,11 @@ export function shouldShowOppBackcards(
 function seatStatus(
   seat: WireSeatView,
   activeSeatIndex: number | null,
-  serverSeatIndex: number,
 ): SeatStateMock['status'] {
-  if (seat.playerId == null || seat.isSittingOut) return 'sitout';
+  if (seat.isSittingOut) return 'sitout';
   if (seat.hasFolded) return 'fold';
   if (seat.isAllIn) return 'allin';
-  if (activeSeatIndex === serverSeatIndex) return 'turn';
+  if (activeSeatIndex === seat.seatIndex) return 'turn';
   return 'idle';
 }
 
@@ -129,8 +206,108 @@ function padBoard(cards: readonly CardModel[]): CardModel[] {
   return out.slice(0, 5);
 }
 
-function buildActionBar(state: PlayerGameState): ActionBarMock {
+function idleActionBar(potAmount = 0): ActionBarMock {
+  return {
+    potAmount,
+    toCall: 0,
+    minRaise: 0,
+    maxRaise: 0,
+    canCheck: false,
+    raiseDisplayAmount: 0,
+    sliderPct: 0,
+    activeQuickId: null,
+    actionsEnabled: false,
+  };
+}
+
+function baseLiveGameInfo(
+  playerCount: number,
+  maxSeats: number,
+): TablePageMock['gameInfo'] {
+  return {
+    gameType: "No Limit Hold'em",
+    stakes: 'MVP',
+    buyIn: '—',
+    playerCount,
+    maxSeats,
+    nextBreak: '—',
+  };
+}
+
+/** Empty table shell while live room connects (no demo mock). */
+export function createWaitingLiveTableView(): AdaptedTableView {
+  return {
+    phase: 'waiting',
+    potAmount: 0,
+    showPotChips: false,
+    boardCards: [],
+    boardReveal: 0,
+    heroHoleCards: null,
+    handHistory: [],
+    chatMessages: [],
+    gameInfo: baseLiveGameInfo(0, 9),
+    actionBar: idleActionBar(),
+    layout: [],
+    playersBySeatIndex: [],
+    seatStatesBySeatIndex: [],
+    gameState: preHandMockGameState(2),
+  };
+}
+
+/** Pre-hand lobby from SERVER_ROOM_STATE — real nicknames, no board/hand. */
+export function adaptRoomLobbyState(
+  room: RoomStatePayload,
+  viewerNickname: string | null,
+  idleTableState: PlayerGameState | null = null,
+): AdaptedTableView {
+  const ordered = orderRoomPlayersForViewer(room.players, viewerNickname);
+  const occupiedCount = ordered.length;
+  const preset = occupiedCountToLayoutPreset(occupiedCount);
+  const layout = LAYOUTS[preset].slice(0, occupiedCount);
+  const stacks = stacksByPlayerId(idleTableState);
+
+  const playersBySeatIndex: PlayerMock[] = ordered.map((member, layoutIdx) => ({
+    id: member.playerId,
+    name: member.nickname,
+    stack: stacks.get(member.playerId) ?? LOBBY_PLACEHOLDER_STACK,
+    ring: RINGS[layoutIdx % RINGS.length]!,
+    init: member.nickname.slice(0, 2).toUpperCase(),
+    avatar: layoutIdx === 0 ? '/assets/avatar-1.png' : null,
+  }));
+
+  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map(() => ({
+    status: 'waiting' as const,
+    bet: 0,
+    amount: '',
+    showOppBackcards: false,
+  }));
+
+  return {
+    phase: 'waiting',
+    potAmount: 0,
+    showPotChips: false,
+    boardCards: [],
+    boardReveal: 0,
+    heroHoleCards: null,
+    handHistory: [],
+    chatMessages: [],
+    gameInfo: baseLiveGameInfo(occupiedCount, room.maxSeats),
+    actionBar: idleActionBar(),
+    layout,
+    playersBySeatIndex,
+    seatStatesBySeatIndex,
+    gameState: preHandMockGameState(preset),
+  };
+}
+
+function buildActionBar(
+  state: PlayerGameState,
+  viewerServerSeatIndex: number,
+): ActionBarMock {
   const actions = state.availableActions;
+  const isViewerTurn =
+    actions != null && state.activeSeatIndex === viewerServerSeatIndex;
+
   return {
     potAmount: state.pot.total,
     toCall: actions?.callAmount ?? 0,
@@ -140,60 +317,76 @@ function buildActionBar(state: PlayerGameState): ActionBarMock {
     raiseDisplayAmount: actions?.minRaise ?? 0,
     sliderPct: 0,
     activeQuickId: null,
+    actionsEnabled: isViewerTurn,
   };
 }
 
 export function adaptPlayerGameState(
   state: PlayerGameState,
   viewerNickname: string | null,
+  room: RoomStatePayload | null = null,
 ): AdaptedTableView {
-  const seatCount = toSeatCount(state.maxSeats);
-  const layout = LAYOUTS[seatCount];
-  const pivot = findViewerSeatIndex(state, viewerNickname);
-  const n = state.seats.length;
+  const viewerIndex = findViewerSeatIndex(state, viewerNickname);
+  const ordered = orderOccupiedSeatsForViewer(state.seats, viewerIndex);
+  const occupiedCount = ordered.length;
+  const preset = occupiedCountToLayoutPreset(occupiedCount);
+  const layout = LAYOUTS[preset].slice(0, occupiedCount);
 
-  const rotatedSeats = rotate(state.seats, pivot);
+  const serverToLayout = new Map<number, number>();
+  ordered.forEach((seat, layoutIdx) => {
+    serverToLayout.set(seat.seatIndex, layoutIdx);
+  });
 
-  const playersBySeatIndex: PlayerMock[] = rotatedSeats.map((seat, layoutIdx) => {
-    if (seat.playerId == null) {
-      return { ...EMPTY_PLAYER, id: `empty-${layoutIdx}` };
-    }
+  const viewerServerSeatIndex = ordered[0]?.seatIndex ?? 0;
+
+  const playersBySeatIndex: PlayerMock[] = ordered.map((seat, layoutIdx) => {
+    const name =
+      resolveSeatNickname(seat, room) ?? (room == null ? 'Player' : '');
     return {
-      id: seat.playerId,
-      name: seat.nickname ?? 'Player',
+      id: seat.playerId!,
+      name,
       stack: seat.stack,
       ring: RINGS[layoutIdx % RINGS.length]!,
-      init: (seat.nickname ?? '?').slice(0, 2).toUpperCase(),
+      init: (name || '?').slice(0, 2).toUpperCase(),
       avatar: layoutIdx === 0 ? '/assets/avatar-1.png' : null,
     };
   });
 
-  const seatStatesBySeatIndex: SeatStateMock[] = rotatedSeats.map((seat, layoutIdx) => {
-    const serverIdx = (pivot + layoutIdx) % n;
-    const status = seatStatus(seat, state.activeSeatIndex, serverIdx);
-    return {
-      status,
-      bet: seat.currentBet,
-      amount: seat.currentBet > 0 ? seat.currentBet : '',
-      showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
-    };
-  });
+  const seatStatesBySeatIndex: SeatStateMock[] = ordered.map((seat, layoutIdx) => ({
+    status: seatStatus(seat, state.activeSeatIndex),
+    bet: seat.currentBet,
+    amount: seat.currentBet > 0 ? seat.currentBet : '',
+    showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
+  }));
 
-  const heroSeat = rotatedSeats[0];
+  const heroSeat = ordered[0];
   const heroHoleCards: [CardModel, CardModel] | null =
     heroSeat?.holeCards?.length === 2
       ? [heroSeat.holeCards[0]!, heroSeat.holeCards[1]!]
       : null;
 
   const gameState: MockGameState = {
-    seats: seatCount,
-    dealerSeatIndex: remapSeatIndex(state.dealerSeatIndex, pivot, n),
-    smallBlindSeatIndex: remapSeatIndex(state.smallBlindSeatIndex, pivot, n),
-    bigBlindSeatIndex: remapSeatIndex(state.bigBlindSeatIndex, pivot, n),
-    activeSeatIndex: remapSeatIndex(state.activeSeatIndex, pivot, n),
+    seats: preset,
+    dealerSeatIndex: remapServerSeatToLayout(
+      state.dealerSeatIndex,
+      serverToLayout,
+    ),
+    smallBlindSeatIndex: remapServerSeatToLayout(
+      state.smallBlindSeatIndex,
+      serverToLayout,
+    ),
+    bigBlindSeatIndex: remapServerSeatToLayout(
+      state.bigBlindSeatIndex,
+      serverToLayout,
+    ),
+    activeSeatIndex: remapServerSeatToLayout(
+      state.activeSeatIndex,
+      serverToLayout,
+    ),
   };
 
   return {
+    phase: 'hand',
     potAmount: state.pot.total,
     showPotChips: state.pot.total > 0,
     boardCards: padBoard(state.boardCards),
@@ -201,15 +394,8 @@ export function adaptPlayerGameState(
     heroHoleCards,
     handHistory: [],
     chatMessages: [],
-    gameInfo: {
-      gameType: "No Limit Hold'em",
-      stakes: 'MVP',
-      buyIn: '—',
-      playerCount: state.seats.filter((s) => s.playerId != null).length,
-      maxSeats: state.maxSeats,
-      nextBreak: '—',
-    },
-    actionBar: buildActionBar(state),
+    gameInfo: baseLiveGameInfo(occupiedCount, state.maxSeats),
+    actionBar: buildActionBar(state, viewerServerSeatIndex),
     layout,
     playersBySeatIndex,
     seatStatesBySeatIndex,

@@ -10,9 +10,15 @@ import { SeatLayer } from '../../components/seats/SeatLayer';
 import { Pot } from '../../components/table/Pot';
 import { TableSurface } from '../../components/table/TableSurface';
 import { RightSidebar } from '../../components/sidebar/RightSidebar';
-import { adaptPlayerGameState } from '../../lib/gameStateAdapter';
+import {
+  adaptPlayerGameState,
+  adaptRoomLobbyState,
+  createWaitingLiveTableView,
+  isActiveHand,
+} from '../../lib/gameStateAdapter';
+import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
+import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
 import { requestGameState, startHand } from '../../net/socket';
-import { TABLE_PAGE_MOCK } from '../../mocks/tableMock';
 import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
@@ -26,53 +32,79 @@ export function TablePage() {
   const gameError = useGameStore((s) => s.gameError);
   const roomState = useRoomStore((s) => s.roomState);
 
+  const isLiveRoom = Boolean(roomId);
+  const minPlayersToStart = 2;
+  const playerCount = roomState?.players.length ?? 0;
+  const rosterAligned =
+    gameState == null ||
+    roomState == null ||
+    gameStateMatchesRoomRoster(gameState, roomState);
+  const enoughPlayersForHand =
+    roomState == null || playerCount >= minPlayersToStart;
+  const hasActiveHand =
+    isActiveHand(gameState) &&
+    rosterAligned &&
+    enoughPlayersForHand;
+
   useEffect(() => {
     if (!roomId) return;
     requestGameState(roomId);
   }, [roomId]);
 
-  const adapted = useMemo(() => {
-    if (!gameState) return null;
-    return adaptPlayerGameState(gameState, nickname);
-  }, [gameState, nickname]);
+  const tableView = useMemo(() => {
+    if (!isLiveRoom) {
+      return createWaitingLiveTableView();
+    }
+    if (gameState && hasActiveHand) {
+      return adaptPlayerGameState(gameState, nickname, roomState);
+    }
+    if (roomState) {
+      return adaptRoomLobbyState(
+        roomState,
+        nickname,
+        hasActiveHand ? null : gameState,
+      );
+    }
+    return createWaitingLiveTableView();
+  }, [isLiveRoom, gameState, hasActiveHand, roomState, nickname]);
 
-  const usingLiveState = adapted != null;
-  const m = useMemo(() => {
-    if (!adapted) return TABLE_PAGE_MOCK;
-    return {
-      ...TABLE_PAGE_MOCK,
-      ...adapted,
-      handHistory: TABLE_PAGE_MOCK.handHistory,
-      chatMessages: TABLE_PAGE_MOCK.chatMessages,
-    };
-  }, [adapted]);
-
-  const showStartHand =
+  const handActive = tableView.phase === 'hand';
+  const canStartHand =
+    isLiveRoom &&
     connectionStatus === 'connected' &&
     roomId != null &&
-    (!gameState || gameState.handId == null);
+    playerCount >= minPlayersToStart &&
+    !hasActiveHand;
+
+  const waitingForPlayers =
+    isLiveRoom && !hasActiveHand && playerCount < minPlayersToStart;
 
   const handleStartHand = useCallback(() => {
-    if (!roomId) return;
+    if (!roomId || !canStartHand) return;
     startHand(roomId);
-  }, [roomId]);
+  }, [roomId, canStartHand]);
+
+  const hasLiveFeed =
+    connectionStatus === 'connected' ||
+    gameState != null ||
+    roomState != null;
 
   const statusLabel =
     connectionStatus === 'connecting'
       ? 'Connecting to room…'
-      : connectionStatus === 'error'
+      : connectionStatus === 'error' && !hasLiveFeed
         ? 'Connection issue — check join page'
-        : isGameLoading
+        : isGameLoading && !gameState && !roomState
           ? 'Loading game state…'
-          : gameError
+          : gameError && !hasLiveFeed
             ? gameError
-            : null;
+            : waitingForPlayers
+              ? 'Waiting for another player (need at least 2)'
+              : null;
 
   const roomMeta =
     roomState != null
-      ? `${roomState.code} · ${roomState.players.length}/${roomState.maxSeats} · ${roomState.status}${
-          !gameState?.handId ? ' · waiting for hand' : ''
-        }`
+      ? formatRoomMetaLine(roomState, hasActiveHand ? gameState : null)
       : null;
 
   return (
@@ -87,7 +119,7 @@ export function TablePage() {
           {roomMeta}
         </p>
       ) : null}
-      {showStartHand ? (
+      {canStartHand ? (
         <div className="table-page__pregame">
           <button
             type="button"
@@ -99,26 +131,28 @@ export function TablePage() {
         </div>
       ) : null}
       <TableSurface />
-      <Pot amount={m.potAmount} showChips={m.showPotChips} />
-      <BoardCards cards={m.boardCards} reveal={m.boardReveal} />
-      {adapted?.heroHoleCards ? (
-        <HeroHoleCards cards={adapted.heroHoleCards} />
+      <Pot amount={tableView.potAmount} showChips={tableView.showPotChips} />
+      {handActive ? (
+        <BoardCards
+          cards={tableView.boardCards}
+          reveal={tableView.boardReveal}
+        />
+      ) : null}
+      {tableView.heroHoleCards ? (
+        <HeroHoleCards cards={tableView.heroHoleCards} />
       ) : null}
       <SeatLayer
-        layout={m.layout}
-        playersBySeatIndex={m.playersBySeatIndex}
-        seatStatesBySeatIndex={m.seatStatesBySeatIndex}
-        gameState={m.gameState}
+        layout={tableView.layout}
+        playersBySeatIndex={tableView.playersBySeatIndex}
+        seatStatesBySeatIndex={tableView.seatStatesBySeatIndex}
+        gameState={tableView.gameState}
+        handActive={handActive}
       />
-      <ActionBar mock={m.actionBar} />
+      {handActive ? <ActionBar mock={tableView.actionBar} /> : null}
       <RightSidebar
-        handHistory={m.handHistory}
-        chatMessages={m.chatMessages}
-        gameInfo={
-          usingLiveState
-            ? { ...m.gameInfo, playerCount: roomState?.players.length ?? m.gameInfo.playerCount }
-            : m.gameInfo
-        }
+        handHistory={tableView.handHistory}
+        chatMessages={tableView.chatMessages}
+        gameInfo={tableView.gameInfo}
       />
     </div>
   );

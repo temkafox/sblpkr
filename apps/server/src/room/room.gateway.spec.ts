@@ -82,7 +82,7 @@ describe('RoomGateway (Socket.IO)', () => {
 
     const tableService = new TableService();
     const gameService = GameService.forTest({ roomService, tableService });
-    const gameBroadcast = new GameBroadcastService(roomService);
+    const gameBroadcast = new GameBroadcastService(roomService, tableService);
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
     httpServer = createServer();
     io = new Server(httpServer, { cors: { origin: true } });

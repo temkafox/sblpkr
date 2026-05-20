@@ -56,6 +56,8 @@ function heroStatusText(st: SeatStateMock): string {
       return 'ALL-IN';
     case 'winner':
       return 'WINNER';
+    case 'waiting':
+      return '';
     default:
       return '';
   }

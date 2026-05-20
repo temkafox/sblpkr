@@ -21,24 +21,46 @@ export function ActionBar({ mock }: ActionBarProps) {
     raiseDisplayAmount,
     sliderPct,
     activeQuickId,
+    actionsEnabled = true,
   } = mock;
 
+  const barDisabled = !actionsEnabled;
   const pct = Math.min(100, Math.max(0, sliderPct));
 
   return (
-    <div className="np-action-bar">
+    <div
+      className={`np-action-bar${barDisabled ? ' np-action-bar--disabled' : ''}`}
+      aria-disabled={barDisabled}
+    >
       <div className="np-ab-btn-group">
-        <button type="button" className="np-ab-btn np-ab-fold">
+        <button
+          type="button"
+          className="np-ab-btn np-ab-fold"
+          disabled={barDisabled}
+        >
           FOLD
         </button>
-        <button type="button" className="np-ab-btn np-ab-check" disabled={!canCheck}>
+        <button
+          type="button"
+          className="np-ab-btn np-ab-check"
+          disabled={barDisabled || !canCheck}
+        >
           CHECK
         </button>
-        <button type="button" className="np-ab-btn np-ab-call" disabled={canCheck}>
+        <button
+          type="button"
+          className="np-ab-btn np-ab-call"
+          disabled={barDisabled || canCheck}
+        >
           CALL <span className="np-ab-sub">${toCall}</span>
         </button>
-        <button type="button" className="np-ab-btn np-ab-raise">
-          RAISE TO <span className="np-ab-sub">${raiseDisplayAmount.toFixed(2)}</span>
+        <button
+          type="button"
+          className="np-ab-btn np-ab-raise"
+          disabled={barDisabled}
+        >
+          RAISE TO{' '}
+          <span className="np-ab-sub">${raiseDisplayAmount.toFixed(2)}</span>
         </button>
       </div>
 
@@ -50,14 +72,24 @@ export function ActionBar({ mock }: ActionBarProps) {
           </div>
         </div>
         <div className="np-ab-raise-mid">
-          <button type="button" className="np-ab-iconbtn" aria-label="Decrease">
+          <button
+            type="button"
+            className="np-ab-iconbtn"
+            aria-label="Decrease"
+            disabled={barDisabled}
+          >
             −
           </button>
           <div className="np-ab-slider">
             <div className="np-ab-fill" style={{ width: `${pct}%` }} />
             <div className="np-ab-thumb" style={{ left: `${pct}%` }} />
           </div>
-          <button type="button" className="np-ab-iconbtn" aria-label="Increase">
+          <button
+            type="button"
+            className="np-ab-iconbtn"
+            aria-label="Increase"
+            disabled={barDisabled}
+          >
             +
           </button>
         </div>
@@ -67,6 +99,7 @@ export function ActionBar({ mock }: ActionBarProps) {
               key={q.id}
               type="button"
               className={`np-ab-qbtn ${activeQuickId === q.id ? 'np-ab-qbtn-active' : ''}`}
+              disabled={barDisabled}
             >
               {q.label}
             </button>

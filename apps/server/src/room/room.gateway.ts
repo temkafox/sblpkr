@@ -49,7 +49,7 @@ export class RoomGateway implements OnGatewayDisconnect {
     const roomId = this.roomService.handleDisconnect(client.id);
     if (roomId != null) {
       void client.leave(roomId);
-      this.broadcastRoomState(roomId);
+      this.afterRoomMembershipChange(roomId);
     }
   }
 
@@ -92,7 +92,7 @@ export class RoomGateway implements OnGatewayDisconnect {
 
     if (result.roomId != null) {
       void client.leave(result.roomId);
-      this.broadcastRoomState(result.roomId);
+      this.afterRoomMembershipChange(result.roomId);
     }
   }
 
@@ -218,6 +218,13 @@ export class RoomGateway implements OnGatewayDisconnect {
     const state = this.roomService.getRoomState(roomId);
     if (state == null) return;
     this.server.to(roomId).emit(SERVER_ROOM_STATE, state);
+  }
+
+  private afterRoomMembershipChange(roomId: string): void {
+    this.broadcastRoomState(roomId);
+    if (this.gameService.abortHandIfInsufficientPlayers(roomId)) {
+      this.gameBroadcast.emitWaitingGameStateToRoom(this.server, roomId);
+    }
   }
 
   private emitError(

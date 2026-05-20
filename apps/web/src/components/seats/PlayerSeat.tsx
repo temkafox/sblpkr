@@ -63,6 +63,8 @@ function opponentStatusText(st: SeatStateMock): string {
       return 'WINNER';
     case 'sitout':
       return 'SITTING OUT';
+    case 'waiting':
+      return '';
     default:
       return '';
   }

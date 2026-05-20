@@ -17,6 +17,10 @@ import type {
 } from '@neonpoker/shared';
 import { io, type Socket } from 'socket.io-client';
 
+import {
+  shouldAcceptGameStatePayload,
+  shouldClearGameStateForRoom,
+} from '../lib/gameStateRoster';
 import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import {
@@ -56,11 +60,28 @@ function attachGlobalListeners(client: Socket): void {
 
   client.on(SERVER_ROOM_STATE, (payload: RoomStatePayload) => {
     useRoomStore.getState().setRoomState(payload);
+    if (
+      shouldClearGameStateForRoom(
+        payload,
+        useGameStore.getState().gameState,
+      )
+    ) {
+      useGameStore.getState().clearGameState();
+    }
+    useGameStore.getState().setGameError(null);
+    useGameStore.getState().setGameLoading(false);
     setConnectionStatus('connected');
   });
 
   client.on(SERVER_GAME_STATE, (payload: PlayerGameState) => {
+    const room = useRoomStore.getState().roomState;
+    if (!shouldAcceptGameStatePayload(payload, room)) {
+      useGameStore.getState().clearGameState();
+      return;
+    }
     useGameStore.getState().setGameState(payload);
+    useRoomStore.getState().clearLastError();
+    setConnectionStatus('connected');
     for (const listener of gameStateListeners) {
       listener(payload);
     }
@@ -167,6 +188,10 @@ export function joinRoom(roomId: string): Promise<RoomStatePayload> {
     };
 
     const onState = (payload: RoomStatePayload) => {
+      useRoomStore.getState().setRoomState(payload);
+      useGameStore.getState().setGameError(null);
+      useGameStore.getState().setGameLoading(false);
+      setConnectionStatus('connected');
       finish(() => resolve(payload));
     };
 

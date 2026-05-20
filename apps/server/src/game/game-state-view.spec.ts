@@ -11,6 +11,7 @@ import { PlayerGameStateSchema, PublicGameStateSchema } from '@neonpoker/shared'
 import type { MutableInternalRoom } from '../room/room.types';
 import {
   containsPrivateEngineFields,
+  toIdlePlayerGameState,
   toPlayerGameState,
   toPublicGameState,
 } from './game-state-view';
@@ -88,6 +89,16 @@ describe('game-state-view (Phase 6C2)', () => {
     expect(serialized.includes('playersById')).toBe(false);
   });
 
+  it('includes room nicknames on occupied seats', () => {
+    const state = huState();
+    const room = sampleRoom();
+
+    const view = PlayerGameStateSchema.parse(toPlayerGameState(state, 0, room));
+
+    expect(view.seats[0]!.nickname).toBe('Alpha');
+    expect(view.seats[1]!.nickname).toBe('Beta');
+  });
+
   it('includes board and pot summary', () => {
     let state = huState();
     const seat = state.table.activeSeatIndex!;
@@ -96,5 +107,19 @@ describe('game-state-view (Phase 6C2)', () => {
     const view = toPlayerGameState(state, seat, sampleRoom());
     expect(view.street).toBe('PRE-FLOP');
     expect(view.pot.total).toBeGreaterThan(0);
+  });
+
+  it('toIdlePlayerGameState clears active-hand fields', () => {
+    const state = huState();
+    const room = sampleRoom();
+    const idle = PlayerGameStateSchema.parse(toIdlePlayerGameState(state, 0, room));
+
+    expect(idle.handId).toBeNull();
+    expect(idle.street).toBeNull();
+    expect(idle.boardCards).toHaveLength(0);
+    expect(idle.pot.total).toBe(0);
+    expect(idle.activeSeatIndex).toBeNull();
+    expect(idle.seats[0]!.holeCards).toBeNull();
+    expect(idle.seats[0]!.nickname).toBe('Alpha');
   });
 });

@@ -15,6 +15,7 @@ import {
   SERVER_GAME_STATE,
   SERVER_HAND_RESULT,
   SERVER_ROOM_STATE,
+  RoomStateSchema,
   StartHandPayloadSchema,
 } from '@neonpoker/shared';
 import { Server } from 'socket.io';
@@ -99,7 +100,7 @@ describe('Game gateway (Phase 6C2)', () => {
       tableService,
       rng: () => createSeededRandom(`6c2-gw-${seq}`),
     });
-    const gameBroadcast = new GameBroadcastService(roomService);
+    const gameBroadcast = new GameBroadcastService(roomService, tableService);
     gateway = new RoomGateway(roomService, gameService, gameBroadcast);
 
     httpServer = createServer();
@@ -264,6 +265,36 @@ describe('Game gateway (Phase 6C2)', () => {
 
     a.disconnect();
     b.disconnect();
+  });
+
+  it('resets active hand and emits idle game state when a player disconnects', async () => {
+    const room = roomService.createRoom({ maxSeats: 6 });
+    const { a, b } = await seatTwo(room.roomId);
+
+    const startA = waitForEvent(a, SERVER_GAME_STATE);
+    const startB = waitForEvent(b, SERVER_GAME_STATE);
+    a.emit(CLIENT_START_HAND, { roomId: room.roomId });
+    const opened = PlayerGameStateSchema.parse(await startA);
+    await startB;
+    expect(opened.handId).not.toBeNull();
+
+    const roomUpdate = waitForEvent(a, SERVER_ROOM_STATE);
+    const idleState = waitForEvent(a, SERVER_GAME_STATE);
+    b.disconnect();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const afterRoom = RoomStateSchema.parse(await roomUpdate);
+    expect(afterRoom.players).toHaveLength(1);
+
+    const idle = PlayerGameStateSchema.parse(await idleState);
+    expect(idle.handId).toBeNull();
+    expect(idle.boardCards).toHaveLength(0);
+    expect(idle.pot.total).toBe(0);
+    expect(idle.dealerSeatIndex).toBeNull();
+    expect(idle.activeSeatIndex).toBeNull();
+    expect(idle.seats[0]!.nickname).toBe('Alpha');
+
+    a.disconnect();
   });
 
   it('emits SERVER_HAND_RESULT when hand completes via fold', async () => {

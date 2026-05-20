@@ -52,6 +52,8 @@ export interface ActionBarMock {
   raiseDisplayAmount: number;
   sliderPct: number;
   activeQuickId: 'min' | 'half' | 'pot' | '2x' | 'all' | null;
+  /** When false, ActionBar is visually disabled (Phase 7B — no emits yet). */
+  actionsEnabled?: boolean;
 }
 
 export type SeatStatus =
@@ -63,7 +65,8 @@ export type SeatStatus =
   | 'allin'
   | 'winner'
   | 'sitout'
-  | 'idle';
+  | 'idle'
+  | 'waiting';
 
 export interface SeatStateMock {
   status: SeatStatus;
@@ -342,6 +345,7 @@ function buildTablePageMock(): TablePageMock {
       raiseDisplayAmount: 34.5,
       sliderPct: 3.7,
       activeQuickId: 'min',
+      actionsEnabled: true,
     },
     layout,
     playersBySeatIndex,

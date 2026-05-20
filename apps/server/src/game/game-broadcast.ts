@@ -7,12 +7,16 @@ import {
 import type { Server } from 'socket.io';
 
 import { RoomService } from '../room/room.service';
+import { TableService } from '../table/table.service';
 import { extractHandResult } from './hand-result';
-import { toPlayerGameState } from './game-state-view';
+import { toIdlePlayerGameState, toPlayerGameState } from './game-state-view';
 
 @Injectable()
 export class GameBroadcastService {
-  constructor(private readonly roomService: RoomService) {}
+  constructor(
+    private readonly roomService: RoomService,
+    private readonly tableService: TableService,
+  ) {}
 
   emitGameStateToRoom(
     server: Server,
@@ -22,8 +26,13 @@ export class GameBroadcastService {
     const room = this.roomService.getRoom(roomId);
     if (room == null) return;
 
-    for (let seatIndex = 0; seatIndex < room.players.length; seatIndex++) {
-      const member = room.players[seatIndex]!;
+    for (const member of room.players) {
+      const seatIndex = this.roomService.getSeatIndexForPlayer(
+        roomId,
+        member.playerId,
+      );
+      if (seatIndex == null) continue;
+
       const socket = server.sockets.sockets.get(member.socketId);
       if (socket == null) continue;
 
@@ -50,6 +59,30 @@ export class GameBroadcastService {
     this.emitGameStateToRoom(server, roomId, state);
     if (state.hand?.isComplete) {
       this.emitHandResultToRoom(server, roomId, state);
+    }
+  }
+
+  /** Broadcast no-hand snapshots so remaining clients clear active-hand UI. */
+  emitWaitingGameStateToRoom(server: Server, roomId: string): void {
+    const room = this.roomService.getRoom(roomId);
+    if (room == null || room.players.length === 0) {
+      return;
+    }
+
+    const state = this.tableService.ensureTableForRoom(room);
+
+    for (const member of room.players) {
+      const seatIndex = this.roomService.getSeatIndexForPlayer(
+        roomId,
+        member.playerId,
+      );
+      if (seatIndex == null) continue;
+
+      const socket = server.sockets.sockets.get(member.socketId);
+      if (socket == null) continue;
+
+      const view = toIdlePlayerGameState(state, seatIndex, room);
+      socket.emit(SERVER_GAME_STATE, view);
     }
   }
 }

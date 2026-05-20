@@ -144,6 +144,26 @@ describe('socket client', () => {
     expect(useSessionStore.getState().connectionStatus).toBe('error');
   });
 
+  it('SERVER_ROOM_STATE clears stale game state when fewer than two players', async () => {
+    useGameStore.getState().setGameState({
+      ...gameState,
+      handId: 'hand-1',
+      street: 'PRE-FLOP',
+    });
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_ROOM_STATE, {
+      ...roomState,
+      players: [{ playerId: 'solo', nickname: 'Solo', seatIndex: 0 }],
+    });
+
+    expect(useGameStore.getState().gameState).toBeNull();
+  });
+
   it('SERVER_GAME_STATE updates gameStore', async () => {
     const connectPromise = connectSocket();
     mockSocket.connected = true;
@@ -153,6 +173,103 @@ describe('socket client', () => {
     fire(SERVER_GAME_STATE, gameState);
 
     expect(useGameStore.getState().gameState).toEqual(gameState);
+  });
+
+  it('SERVER_ROOM_STATE clears game loading flag', async () => {
+    useGameStore.getState().setGameLoading(true);
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_ROOM_STATE, roomState);
+
+    expect(useGameStore.getState().isGameLoading).toBe(false);
+  });
+
+  it('SERVER_ROOM_STATE clears stale errors and marks connected', async () => {
+    useSessionStore.setState({
+      nickname: 'alice',
+      roomId: roomState.roomId,
+      connectionStatus: 'error',
+    });
+    useRoomStore.setState({
+      roomState: null,
+      lastError: { code: 'ROOM_FULL', message: 'full' },
+    });
+    useGameStore.getState().setGameError('stale');
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_ROOM_STATE, roomState);
+
+    expect(useSessionStore.getState().connectionStatus).toBe('connected');
+    expect(useRoomStore.getState().lastError).toBeNull();
+    expect(useGameStore.getState().gameError).toBeNull();
+  });
+
+  it('SERVER_GAME_STATE clears stale errors and marks connected', async () => {
+    useSessionStore.setState({
+      nickname: 'alice',
+      roomId: roomState.roomId,
+      connectionStatus: 'error',
+    });
+    useRoomStore.setState({
+      roomState: null,
+      lastError: { code: 'NICKNAME_TAKEN' },
+    });
+    useGameStore.getState().setGameError('stale');
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_GAME_STATE, gameState);
+
+    expect(useSessionStore.getState().connectionStatus).toBe('connected');
+    expect(useRoomStore.getState().lastError).toBeNull();
+    expect(useGameStore.getState().gameError).toBeNull();
+  });
+
+  it('SERVER_GAME_STATE ignores stale active hand when roster mismatches', async () => {
+    useRoomStore.setState({
+      roomState: {
+        ...roomState,
+        players: [{ playerId: 'new-a', nickname: 'Alice', seatIndex: 0 }],
+      },
+    });
+
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_GAME_STATE, {
+      ...gameState,
+      handId: 'hand-1',
+      street: 'PRE-FLOP',
+      seats: [
+        {
+          seatIndex: 0,
+          playerId: 'old-a',
+          nickname: 'Alice',
+          stack: 200,
+          currentBet: 1,
+          hasFolded: false,
+          isAllIn: false,
+          isSittingOut: false,
+          holeCards: null,
+          holeCardCount: 2,
+        },
+      ],
+    });
+
+    expect(useGameStore.getState().gameState).toBeNull();
   });
 
   it('SERVER_HAND_RESULT updates gameStore', async () => {

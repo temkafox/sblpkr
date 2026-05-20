@@ -219,7 +219,7 @@ export class RoomService {
     const seated: InternalSeatedPlayer = {
       playerId: session.playerId,
       nickname: session.nickname,
-      seatIndex: null,
+      seatIndex: room.players.length,
       socketId,
     };
 

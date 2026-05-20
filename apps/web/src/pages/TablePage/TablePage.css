@@ -76,3 +76,9 @@
     0 0 0 1px rgba(34, 211, 255, 0.72) inset,
     0 0 28px rgba(34, 211, 255, 0.55);
 }
+
+.table-page__start-hand:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

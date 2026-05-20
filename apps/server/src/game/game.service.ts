@@ -42,14 +42,12 @@ export class GameService {
   }
 
   getGameState(roomId: string): CoreGameState {
-    const state = this.tableService.getTableState(roomId);
-    if (state == null) {
-      throw new GameOrchestrationError(
-        'TABLE_NOT_FOUND',
-        `No table for room ${roomId}`,
-      );
+    const room = this.requireRoom(roomId);
+    const existing = this.tableService.getTableState(roomId);
+    if (existing != null) {
+      return existing;
     }
-    return state;
+    return this.tableService.ensureTableForRoom(room);
   }
 
   startHand(roomId: string): CoreGameState {
@@ -105,6 +103,19 @@ export class GameService {
     const progressed = progressGameState(this.getGameState(roomId));
     this.tableService.setTableState(roomId, progressed);
     return progressed;
+  }
+
+  /**
+   * MVP: when fewer than two players remain, drop in-memory table state so
+   * clients do not keep a stale active hand after leave/disconnect.
+   */
+  abortHandIfInsufficientPlayers(roomId: string): boolean {
+    const room = this.roomService.getRoom(roomId);
+    if (room == null || room.players.length >= 2) {
+      return false;
+    }
+    this.tableService.deleteTable(roomId);
+    return true;
   }
 
   private requireRoom(roomId: string) {

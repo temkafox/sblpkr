@@ -15,6 +15,8 @@ export interface SeatLayerProps {
   playersBySeatIndex: PlayerMock[];
   seatStatesBySeatIndex: SeatStateMock[];
   gameState: MockGameState;
+  /** When false, hides blinds/button badges, bet chips, and opponent holes. */
+  handActive?: boolean;
 }
 
 /** Blind/button badges — driven only by mock indices (no blind math in UI). */
@@ -31,10 +33,11 @@ export function SeatLayer({
   playersBySeatIndex,
   seatStatesBySeatIndex,
   gameState,
+  handActive = true,
 }: SeatLayerProps) {
-  const showBadges = true;
-  const showBets = true;
-  const showOppHoles = true;
+  const showBadges = handActive;
+  const showBets = handActive;
+  const showOppHoles = handActive;
 
   return (
     <div className="np-seat-layer">

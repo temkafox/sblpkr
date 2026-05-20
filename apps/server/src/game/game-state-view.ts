@@ -22,6 +22,23 @@ function nicknameByPlayerId(room: MutableInternalRoom | null): NicknameLookup {
   return map;
 }
 
+function nicknameForSeat(
+  seat: { readonly playerId: string | null; readonly seatIndex: number },
+  room: MutableInternalRoom | null,
+  nicknames: NicknameLookup,
+): string | null {
+  if (seat.playerId == null) return null;
+  const byId = nicknames.get(seat.playerId);
+  if (byId != null && byId.length > 0) return byId;
+  const member = room?.players.find((p) => p.playerId === seat.playerId);
+  if (member?.nickname) return member.nickname;
+  const byJoinOrder = room?.players[seat.seatIndex];
+  if (byJoinOrder?.playerId === seat.playerId && byJoinOrder.nickname) {
+    return byJoinOrder.nickname;
+  }
+  return null;
+}
+
 function mapPot(state: CoreGameState): PublicGameState['pot'] {
   const hand = state.hand;
   if (hand == null) {
@@ -78,10 +95,7 @@ function buildSeatViews(
       return {
         seatIndex: seat.seatIndex,
         playerId: seat.playerId,
-        nickname:
-          seat.playerId != null
-            ? (nicknames.get(seat.playerId) ?? null)
-            : null,
+        nickname: nicknameForSeat(seat, room, nicknames),
         stack: runtime?.chips ?? 0,
         currentBet: runtime?.currentBet ?? 0,
         hasFolded: runtime?.hasFolded ?? false,
@@ -151,6 +165,36 @@ export function toPlayerGameState(
   return {
     ...base,
     ...(availableActions != null ? { availableActions: { ...availableActions } } : {}),
+  };
+}
+
+/** Waiting-table snapshot — roster-aligned stacks, no active hand UI fields. */
+export function toIdlePlayerGameState(
+  state: CoreGameState,
+  viewerSeatIndex: SeatIndex,
+  room: MutableInternalRoom | null = null,
+): PlayerGameState {
+  const view = toPlayerGameState(state, viewerSeatIndex, room);
+  return {
+    ...view,
+    street: null,
+    boardCards: [],
+    pot: { total: 0, sidePots: [] },
+    dealerSeatIndex: null,
+    smallBlindSeatIndex: null,
+    bigBlindSeatIndex: null,
+    activeSeatIndex: null,
+    handId: null,
+    handComplete: false,
+    showdownReady: false,
+    seats: view.seats.map((seat) => ({
+      ...seat,
+      currentBet: 0,
+      hasFolded: false,
+      isAllIn: false,
+      holeCards: null,
+      holeCardCount: null,
+    })),
   };
 }
 

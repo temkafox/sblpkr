@@ -281,14 +281,45 @@ describe('GameService (Phase 6C1)', () => {
     expect(getTotalWealth(state)).toBe(wealthStart);
   });
 
-  it('getGameState throws when table is missing', () => {
+  it('getGameState throws when room is missing', () => {
     const { game } = gameHarness('6c1-missing');
     try {
       game.getGameState('missing-room');
       expect.fail('expected throw');
     } catch (err) {
-      expect((err as GameOrchestrationError).code).toBe('TABLE_NOT_FOUND');
+      expect((err as GameOrchestrationError).code).toBe('ROOM_NOT_FOUND');
     }
+  });
+
+  it('getGameState ensures table for seated room before first hand', () => {
+    const { game, roomService } = gameHarness('6c1-lobby-state');
+    const roomId = seatRoom(roomService, 2, 6);
+    const state = game.getGameState(roomId);
+    const occupied = state.table.seats.filter((s) => s.playerId != null);
+    expect(occupied).toHaveLength(2);
+  });
+
+  it('abortHandIfInsufficientPlayers deletes table when one player remains', () => {
+    const { roomService, tableService, game } = gameHarness('6c1-abort');
+    const roomId = seatRoom(roomService, 2, 6);
+    game.startHand(roomId);
+    expect(tableService.hasTable(roomId)).toBe(true);
+
+    const room = roomService.getRoom(roomId)!;
+    const leaverSocket = room.players[1]!.socketId;
+    roomService.handleDisconnect(leaverSocket);
+
+    expect(game.abortHandIfInsufficientPlayers(roomId)).toBe(true);
+    expect(tableService.hasTable(roomId)).toBe(false);
+  });
+
+  it('abortHandIfInsufficientPlayers is no-op with two or more players', () => {
+    const { roomService, tableService, game } = gameHarness('6c1-keep');
+    const roomId = seatRoom(roomService, 2, 6);
+    game.startHand(roomId);
+
+    expect(game.abortHandIfInsufficientPlayers(roomId)).toBe(false);
+    expect(tableService.hasTable(roomId)).toBe(true);
   });
 
   it('applyPlayerAction throws without an active hand', () => {
