@@ -2,13 +2,14 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
-import { resolveHttpCors } from './cors.config';
+import { logCorsConfig, resolveHttpCors } from './cors.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn'],
   });
 
+  logCorsConfig();
   app.enableCors(resolveHttpCors());
   app.useWebSocketAdapter(new IoAdapter(app));
 

@@ -10,8 +10,11 @@ pnpm install
 VITE_API_URL=http://YOUR_VPS_IP pnpm --filter @neonpoker/web build
 pnpm --filter @neonpoker/server build
 
-# Allow browser origin for Socket.IO (REST same-origin may work without this; sockets need it)
-CORS_ORIGINS=http://YOUR_VPS_IP pm2 restart neonpoker-server --update-env
+# pm2 must see CORS_ORIGINS or Socket.IO rejects the browser (curl still works)
+pm2 start ecosystem.config.cjs
+# or: CORS_ORIGINS=http://YOUR_VPS_IP pm2 restart neonpoker-server --update-env
+pm2 logs neonpoker-server --lines 3
+# expect: CORS: dev localhost + http://YOUR_VPS_IP
 
 sudo nginx -t && sudo systemctl reload nginx
 ```
