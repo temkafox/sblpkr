@@ -27,7 +27,6 @@ import {
   isActiveHand,
   viewerSeatStack,
 } from '../../lib/gameStateAdapter';
-import { formatChips } from '../../lib/formatChips';
 import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
 import { chatRowsFromMessages } from '../../lib/chatAdapter';
 import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
@@ -325,18 +324,6 @@ export function TablePage() {
           {roomMeta}
         </p>
       ) : null}
-      {canRebuy ? (
-        <div className="table-page__rebuy">
-          <button
-            type="button"
-            className="table-page__rebuy-btn"
-            onClick={handleRebuy}
-            disabled={isGameLoading}
-          >
-            Rebuy ${formatChips(rebuyAmount)}
-          </button>
-        </div>
-      ) : null}
       {canStartHand ? (
         <div className="table-page__pregame">
           <button
@@ -392,6 +379,10 @@ export function TablePage() {
         gameState={tableView.gameState}
         handActive={handActive}
         heroHoleCards={tableView.heroHoleCards}
+        showHeroRebuy={canRebuy}
+        heroRebuyAmount={rebuyAmount}
+        heroRebuyDisabled={isGameLoading}
+        onHeroRebuy={handleRebuy}
       />
       {viewerDealtIntoHand ? (
         <ActionBar

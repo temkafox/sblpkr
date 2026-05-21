@@ -158,7 +158,11 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     try {
       const state = this.gameService.rebuy(roomId, seatIndex);
       this.broadcastRoomState(roomId);
-      this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
+      if (state.hand?.isComplete) {
+        this.gameBroadcast.emitGameStateToRoom(this.server, roomId, state);
+      } else {
+        this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
+      }
       this.gameBroadcast.emitHandHistoryToRoom(this.server, roomId);
       this.syncNextHandReadyAfterEligibilityChange(roomId);
     } catch (err) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeededRandom, getPlayerAtSeat } from '@neonpoker/poker-core';
+import type { HandResultPayload } from '@neonpoker/shared';
 
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
@@ -7,6 +8,7 @@ import { countEligiblePlayers } from '../table/table-roster-sync';
 import { DEFAULT_REBUY_CHIPS, DEFAULT_STARTING_CHIPS } from './game.constants';
 import { GameOrchestrationError } from './game.errors';
 import { GameService } from './game.service';
+import { toPlayerGameState } from './game-state-view';
 
 function seatRoom(roomService: RoomService, count: number): string {
   const room = roomService.createRoom({ maxSeats: 6 });
@@ -54,13 +56,125 @@ describe('GameService.rebuy (Phase 7G)', () => {
       }),
     });
     tableService.setTableState(roomId, state);
+    tableService.setHandResult(roomId, {
+      handId: state.hand!.handId,
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': winnerChips },
+      totalAwarded: winnerChips,
+      isFoldWin: true,
+      winningHandLabel: null,
+      potResults: [],
+    });
 
     const after = game.rebuy(roomId, 1);
     expect(after.playersById[p1Id]!.chips).toBe(DEFAULT_REBUY_CHIPS);
     expect(after.playersById[p1Id]!.isSittingOut).toBe(false);
     expect(after.playersById[p0.playerId]!.chips).toBe(winnerChips);
-    expect(after.hand).toBeNull();
+    expect(after.hand?.isComplete).toBe(true);
+    expect(after.hand?.handId).toBe(state.hand!.handId);
+    expect(tableService.getHandResult(roomId)?.handId).toBe(state.hand!.handId);
     expect(countEligiblePlayers(after)).toBe(2);
+  });
+
+  it('rebuy after hand complete preserves board and handEndKind in wire view', () => {
+    const roomService = RoomService.forTest();
+    const tableService = new TableService();
+    const game = GameService.forTest({
+      roomService,
+      tableService,
+      rng: () => createSeededRandom('rebuy-preserve-view'),
+    });
+    const roomId = seatRoom(roomService, 2);
+    const room = roomService.getRoom(roomId)!;
+    const bustedId = room.players[1]!.playerId;
+
+    let state = game.startHand(roomId);
+    const board = Object.freeze([
+      { r: 'A', s: 's' },
+      { r: 'K', s: 'h' },
+      { r: 'Q', s: 'd' },
+      { r: 'J', s: 'c' },
+      { r: '10', s: 's' },
+    ]);
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({
+        ...state.hand!,
+        isComplete: true,
+        showdownReady: true,
+        boardCards: board,
+      }),
+      playersById: Object.freeze({
+        ...state.playersById,
+        [bustedId]: Object.freeze({
+          ...state.playersById[bustedId]!,
+          chips: 0,
+          isSittingOut: true,
+          hasFolded: true,
+        }),
+      }),
+    });
+    tableService.setTableState(roomId, state);
+    const cached: HandResultPayload = {
+      handId: state.hand!.handId,
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 400 },
+      totalAwarded: 400,
+      isFoldWin: true,
+      winningHandLabel: null,
+      potResults: [],
+    };
+    tableService.setHandResult(roomId, cached);
+
+    const after = game.rebuy(roomId, 1);
+    const view = toPlayerGameState(
+      after,
+      0,
+      room,
+      tableService.getHandResult(roomId),
+    );
+    expect(view.handComplete).toBe(true);
+    expect(view.handId).toBe(state.hand!.handId);
+    expect(view.boardCards).toEqual([...board]);
+    expect(view.handEndKind).toBe('FOLD_WIN');
+    expect(tableService.getHandResult(roomId)?.handId).toBe(state.hand!.handId);
+  });
+
+  it('rebuy after hand complete updates only the rebuy player stack', () => {
+    const roomService = RoomService.forTest();
+    const tableService = new TableService();
+    const game = GameService.forTest({
+      roomService,
+      tableService,
+      rng: () => createSeededRandom('rebuy-stack-only'),
+    });
+    const roomId = seatRoom(roomService, 2);
+    const room = roomService.getRoom(roomId)!;
+    const winnerId = room.players[0]!.playerId;
+    const bustedId = room.players[1]!.playerId;
+
+    let state = game.startHand(roomId);
+    const winnerChips = 400;
+    state = Object.freeze({
+      ...state,
+      hand: Object.freeze({ ...state.hand!, isComplete: true, showdownReady: true }),
+      playersById: Object.freeze({
+        [winnerId]: Object.freeze({
+          ...state.playersById[winnerId]!,
+          chips: winnerChips,
+        }),
+        [bustedId]: Object.freeze({
+          ...state.playersById[bustedId]!,
+          chips: 0,
+          isSittingOut: true,
+        }),
+      }),
+    });
+    tableService.setTableState(roomId, state);
+
+    const after = game.rebuy(roomId, 1);
+    expect(after.playersById[bustedId]!.chips).toBe(DEFAULT_REBUY_CHIPS);
+    expect(after.playersById[winnerId]!.chips).toBe(winnerChips);
   });
 
   it('rejects rebuy when player still has chips', () => {

@@ -63,6 +63,10 @@ export interface HeroSeatProps {
   state: SeatStateMock;
   position: SeatPosition;
   holeCards?: [CardModel, CardModel] | null;
+  showRebuy?: boolean;
+  rebuyAmount?: number;
+  rebuyDisabled?: boolean;
+  onRebuy?: () => void;
 }
 
 export function HeroSeat({
@@ -70,6 +74,10 @@ export function HeroSeat({
   state: st,
   position: pos,
   holeCards,
+  showRebuy = false,
+  rebuyAmount = 200,
+  rebuyDisabled = false,
+  onRebuy,
 }: HeroSeatProps) {
   const w = pos.w || 320;
   const h = pos.h || 110;
@@ -83,6 +91,16 @@ export function HeroSeat({
           <div className="name">{player.name}</div>
           <div className="stack">${formatChips(player.stack)}</div>
           <div className={`status ${heroStatusClass(st.status)}`}>{heroStatusText(st)}</div>
+          {showRebuy ? (
+            <button
+              type="button"
+              className="seat-rebuy-btn"
+              onClick={onRebuy}
+              disabled={rebuyDisabled}
+            >
+              Rebuy ${formatChips(rebuyAmount)}
+            </button>
+          ) : null}
         </div>
         <div className="timer">
           <div className="bar" key={`${player.id}-${st.status}`} />

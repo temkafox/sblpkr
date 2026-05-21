@@ -18,6 +18,10 @@ export interface SeatLayerProps {
   /** When false, hides blinds/button badges, bet chips, and opponent holes. */
   handActive?: boolean;
   heroHoleCards?: [CardModel, CardModel] | null;
+  showHeroRebuy?: boolean;
+  heroRebuyAmount?: number;
+  heroRebuyDisabled?: boolean;
+  onHeroRebuy?: () => void;
 }
 
 /** Blind/button badges — driven only by mock indices (no blind math in UI). */
@@ -36,6 +40,10 @@ export function SeatLayer({
   gameState,
   handActive = true,
   heroHoleCards = null,
+  showHeroRebuy = false,
+  heroRebuyAmount = 200,
+  heroRebuyDisabled = false,
+  onHeroRebuy,
 }: SeatLayerProps) {
   const showBadges = handActive;
   const showBets = handActive;
@@ -70,6 +78,10 @@ export function SeatLayer({
                 state={st}
                 position={pos}
                 holeCards={heroHoleCards}
+                showRebuy={showHeroRebuy}
+                rebuyAmount={heroRebuyAmount}
+                rebuyDisabled={heroRebuyDisabled}
+                onRebuy={onHeroRebuy}
               />
             ) : (
               <PlayerSeat

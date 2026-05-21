@@ -163,30 +163,44 @@ export class GameService {
       );
     }
 
+    const handComplete = hand != null && hand.isComplete;
+
     const playersById: Record<string, (typeof state.playersById)[string]> =
       Object.create(null);
     for (const pid of Object.keys(state.playersById)) {
       playersById[pid] = state.playersById[pid]!;
     }
-    playersById[playerId] = Object.freeze({
-      ...player,
-      chips: DEFAULT_REBUY_CHIPS,
-      isSittingOut: false,
-      holeCards: Object.freeze([]),
-      currentBet: 0,
-      totalCommitted: 0,
-      hasFolded: false,
-      isAllIn: false,
-    });
+    playersById[playerId] = Object.freeze(
+      handComplete
+        ? {
+            ...player,
+            chips: DEFAULT_REBUY_CHIPS,
+            isSittingOut: false,
+          }
+        : {
+            ...player,
+            chips: DEFAULT_REBUY_CHIPS,
+            isSittingOut: false,
+            holeCards: Object.freeze([]),
+            currentBet: 0,
+            totalCommitted: 0,
+            hasFolded: false,
+            isAllIn: false,
+          },
+    );
 
     let next = Object.freeze({
       ...state,
       playersById: Object.freeze(playersById),
     });
     next = applySeatEligibility(syncTableToRoom(room, next));
-    next = clearCompletedHandForWaiting(next);
-    this.tableService.setTableState(roomId, next);
-    this.tableService.clearHandResult(roomId);
+    if (handComplete) {
+      this.tableService.setTableState(roomId, next);
+    } else {
+      next = clearCompletedHandForWaiting(next);
+      this.tableService.setTableState(roomId, next);
+      this.tableService.clearHandResult(roomId);
+    }
     this.handHistory.onRebuy(room, seatIndex, DEFAULT_REBUY_CHIPS);
     return next;
   }

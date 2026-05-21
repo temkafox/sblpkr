@@ -175,6 +175,10 @@ const liveState: PlayerGameState = {
   ],
 };
 
+function heroRebuyButton(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector('.seat.hero .seat-rebuy-btn');
+}
+
 function renderTable() {
   return render(
     <MemoryRouter initialEntries={[`/table/${roomId}`]}>
@@ -710,8 +714,11 @@ describe('TablePage live room', () => {
         },
       ],
     });
-    renderTable();
-    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+    const { container } = renderTable();
+    expect(heroRebuyButton(container)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^rebuy/i })).toBe(
+      heroRebuyButton(container),
+    );
   });
 
   it('does not show Rebuy for player with chips', () => {
@@ -742,8 +749,8 @@ describe('TablePage live room', () => {
         },
       ],
     });
-    renderTable();
-    fireEvent.click(screen.getByRole('button', { name: /rebuy \$200/i }));
+    const { container } = renderTable();
+    fireEvent.click(heroRebuyButton(container)!);
     expect(socket.rebuy).toHaveBeenCalledWith(roomId);
   });
 
@@ -826,8 +833,8 @@ describe('TablePage live room', () => {
       roomId,
       connectionStatus: 'connected',
     });
-    renderTable();
-    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+    const { container } = renderTable();
+    expect(heroRebuyButton(container)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^start hand$/i }),
     ).not.toBeInTheDocument();
@@ -1043,11 +1050,81 @@ describe('TablePage live room', () => {
       roomId,
       connectionStatus: 'connected',
     });
-    renderTable();
-    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+    const { container } = renderTable();
+    expect(heroRebuyButton(container)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /ready for next hand/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('after rebuy on completed hand board and result stay visible', () => {
+    const boardCards = [
+      { r: 'A', s: 's' },
+      { r: 'K', s: 'h' },
+      { r: 'Q', s: 'd' },
+      { r: 'J', s: 'c' },
+      { r: '10', s: 's' },
+    ] as const;
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      handEndKind: 'SHOWDOWN',
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      boardCards: [...boardCards],
+      viewerSeatIndex: 1,
+      seats: [
+        { ...liveState.seats[0]!, stack: 400 },
+        {
+          ...liveState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+    useGameStore.getState().setHandResult({
+      handId: 'hand-1',
+      winnerSeatIndexes: [0],
+      awardedAmountsBySeatIndex: { '0': 400 },
+      totalAwarded: 400,
+    });
+    const { container, rerender } = renderTable();
+    expect(container.querySelector('.np-board')).toBeInTheDocument();
+    expect(container.querySelector('.hand-result-banner')).toBeInTheDocument();
+
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      handEndKind: 'SHOWDOWN',
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      boardCards: [...boardCards],
+      viewerSeatIndex: 1,
+      seats: [
+        { ...liveState.seats[0]!, stack: 400 },
+        {
+          ...liveState.seats[1]!,
+          stack: 200,
+          isSittingOut: false,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+    rerender(
+      <MemoryRouter initialEntries={[`/table/${roomId}`]}>
+        <Routes>
+          <Route path="/table/:roomId" element={<TablePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector('.np-board')).toBeInTheDocument();
+    expect(container.querySelector('.hand-result-banner')).toBeInTheDocument();
+    expect(heroRebuyButton(container)).toBeNull();
   });
 
   it('after rebuy viewer sees Ready when added to eligible list', () => {
