@@ -17,6 +17,9 @@ import {
   canViewerStartHand,
   countEligibleForNextHand,
   createWaitingLiveTableView,
+  isViewerDealtIntoHand,
+  isViewerSeatedInRoom,
+  resolveViewerSeatFromRoom,
   resolveViewerServerSeatIndex,
   isActiveHand,
   viewerSeatStack,
@@ -78,12 +81,18 @@ export function TablePage() {
   const viewerSeatIndex =
     gameState != null
       ? resolveViewerServerSeatIndex(gameState, nickname)
-      : null;
+      : roomState != null
+        ? resolveViewerSeatFromRoom(roomState, nickname)
+        : null;
+  const viewerDealtIntoHand =
+    handInProgress &&
+    gameState != null &&
+    viewerSeatIndex != null &&
+    isViewerDealtIntoHand(gameState, viewerSeatIndex);
   const availableActions = gameState?.availableActions;
   const isMyTurn =
-    handInProgress &&
+    viewerDealtIntoHand &&
     availableActions != null &&
-    viewerSeatIndex != null &&
     gameState?.activeSeatIndex === viewerSeatIndex;
 
   useEffect(() => {
@@ -151,6 +160,7 @@ export function TablePage() {
 
   const handActive = tableView.phase === 'hand';
   const viewerStack = viewerSeatStack(gameState, viewerSeatIndex);
+  const viewerSeatedInRoom = isViewerSeatedInRoom(roomState, nickname);
   const startHandBase = {
     isLiveRoom,
     connectionStatus,
@@ -160,6 +170,7 @@ export function TablePage() {
     eligibleForHand,
     hasActiveHand,
     viewerStack,
+    viewerSeatedInRoom,
   };
   const canStartHand = canViewerStartHand(startHandBase);
   const canStartNextHand =
@@ -350,7 +361,7 @@ export function TablePage() {
         handActive={handActive}
         heroHoleCards={tableView.heroHoleCards}
       />
-      {handInProgress ? (
+      {viewerDealtIntoHand ? (
         <ActionBar
           availableActions={availableActions}
           potAmount={gameState?.pot.total ?? 0}

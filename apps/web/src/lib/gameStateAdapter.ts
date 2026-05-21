@@ -140,6 +140,37 @@ export function canViewerRebuy(opts: {
   );
 }
 
+/** Viewer seat from room roster when game state has not arrived yet. */
+export function resolveViewerSeatFromRoom(
+  room: RoomStatePayload,
+  viewerNickname: string | null,
+): number | null {
+  if (viewerNickname == null) {
+    return null;
+  }
+  const nick = viewerNickname.trim().toLowerCase();
+  const member = room.players.find(
+    (p) => p.nickname?.trim().toLowerCase() === nick,
+  );
+  return member?.seatIndex ?? null;
+}
+
+/** True when the session nickname matches a connected seated room member. */
+export function isViewerSeatedInRoom(
+  room: RoomStatePayload | null,
+  viewerNickname: string | null,
+): boolean {
+  if (room == null || viewerNickname == null) {
+    return false;
+  }
+  const nick = viewerNickname.trim().toLowerCase();
+  return room.players.some(
+    (p) =>
+      p.nickname?.trim().toLowerCase() === nick &&
+      p.connectionStatus === 'connected',
+  );
+}
+
 /** Viewer-specific: start hand when viewer has chips and table has enough eligible players. */
 export function canViewerStartHand(opts: {
   readonly isLiveRoom: boolean;
@@ -150,10 +181,18 @@ export function canViewerStartHand(opts: {
   readonly eligibleForHand: number;
   readonly hasActiveHand: boolean;
   readonly viewerStack: number | null;
+  /** Pre-first-hand lobby: seated viewer assumed at {@link LOBBY_PLACEHOLDER_STACK}. */
+  readonly viewerSeatedInRoom?: boolean;
   readonly afterHandResult?: boolean;
 }): boolean {
   const viewerHasChips =
-    opts.viewerStack != null && opts.viewerStack > 0;
+    opts.viewerStack != null
+      ? opts.viewerStack > 0
+      : Boolean(
+          opts.viewerSeatedInRoom &&
+            !opts.hasActiveHand &&
+            !opts.afterHandResult,
+        );
   const tableReady =
     opts.playerCount >= opts.minPlayersToStart &&
     opts.eligibleForHand >= opts.minPlayersToStart;

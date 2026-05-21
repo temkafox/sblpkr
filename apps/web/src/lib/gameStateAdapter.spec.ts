@@ -661,6 +661,35 @@ describe('gameStateAdapter', () => {
     ).toBe(false);
   });
 
+  it('canViewerStartHand allows pre-hand lobby before gameState arrives', () => {
+    expect(
+      canViewerStartHand({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        playerCount: 2,
+        minPlayersToStart: 2,
+        eligibleForHand: 2,
+        hasActiveHand: false,
+        viewerStack: null,
+        viewerSeatedInRoom: true,
+      }),
+    ).toBe(true);
+    expect(
+      canViewerStartHand({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        playerCount: 2,
+        minPlayersToStart: 2,
+        eligibleForHand: 2,
+        hasActiveHand: false,
+        viewerStack: null,
+        viewerSeatedInRoom: false,
+      }),
+    ).toBe(false);
+  });
+
   it('disconnected seat shows AWAY and not YOUR TURN during active hand', () => {
     expect(
       resolveSeatStatus(
