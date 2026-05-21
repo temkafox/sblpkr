@@ -45,12 +45,12 @@ import {
   toPlayerGameState,
 } from '../game/game-state-view';
 import { ChatService, type ChatAuthor } from '../chat/chat.service';
-import { LOCAL_DEV_SOCKET_CORS } from '../cors.config';
+import { resolveSocketCors } from '../cors.config';
 import { RoomService } from './room.service';
 
 @Injectable()
 @WebSocketGateway({
-  cors: LOCAL_DEV_SOCKET_CORS,
+  cors: resolveSocketCors(),
 })
 export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
   @WebSocketServer()

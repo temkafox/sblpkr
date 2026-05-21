@@ -194,7 +194,7 @@ export async function connectSocket(): Promise<Socket> {
 
   return new Promise((resolve, reject) => {
     const client = io(getApiBaseUrl(), {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
     });
     socket = client;
