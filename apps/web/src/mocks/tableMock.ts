@@ -72,7 +72,8 @@ export type SeatStatus =
   | 'sitout'
   | 'away'
   | 'idle'
-  | 'waiting';
+  | 'waiting'
+  | 'next_hand';
 
 export interface SeatStateMock {
   status: SeatStatus;

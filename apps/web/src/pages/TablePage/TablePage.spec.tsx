@@ -44,6 +44,15 @@ const duoRoom: RoomStatePayload = {
   ],
 };
 
+const trioRoom: RoomStatePayload = {
+  ...soloRoom,
+  players: [
+    { playerId: 'a', nickname: 'PlayerA', seatIndex: 0, connectionStatus: 'connected' },
+    { playerId: 'b', nickname: 'PlayerB', seatIndex: 1, connectionStatus: 'connected' },
+    { playerId: 'c', nickname: 'PlayerC', seatIndex: 2, connectionStatus: 'connected' },
+  ],
+};
+
 const idlePreHandState: PlayerGameState = {
   tableId: roomId,
   maxSeats: 9,
@@ -83,6 +92,51 @@ const idlePreHandState: PlayerGameState = {
       holeCards: null,
       holeCardCount: null,
     },
+  ],
+};
+
+const idleThreeWay: PlayerGameState = {
+  ...idlePreHandState,
+  viewerSeatIndex: 0,
+  seats: [
+    {
+      ...idlePreHandState.seats[0]!,
+      seatIndex: 0,
+      playerId: 'a',
+      nickname: 'PlayerA',
+      stack: 600,
+    },
+    {
+      ...idlePreHandState.seats[1]!,
+      seatIndex: 1,
+      playerId: 'b',
+      nickname: 'PlayerB',
+      stack: 200,
+    },
+    {
+      seatIndex: 2,
+      playerId: 'c',
+      nickname: 'PlayerC',
+      stack: 0,
+      currentBet: 0,
+      hasFolded: false,
+      isAllIn: false,
+      isSittingOut: true,
+      holeCards: null,
+      holeCardCount: null,
+    },
+    ...Array.from({ length: 6 }, (_, i) => ({
+      seatIndex: i + 3,
+      playerId: null,
+      nickname: null,
+      stack: 0,
+      currentBet: 0,
+      hasFolded: false,
+      isAllIn: false,
+      isSittingOut: false,
+      holeCards: null,
+      holeCardCount: null,
+    })),
   ],
 };
 
@@ -758,6 +812,72 @@ describe('TablePage live room', () => {
     const { container } = renderTable();
     expect(container.querySelector('.seat.state-sitout')).toBeNull();
     expect(container.querySelector('.status.t-sitout')).toBeNull();
+  });
+
+  it('three-way idle: busted viewer sees Rebuy, stacked viewer sees Start Hand', () => {
+    useRoomStore.getState().setRoomState(trioRoom);
+    useGameStore.getState().setGameState({
+      ...idleThreeWay,
+      viewerSeatIndex: 2,
+    });
+    useSessionStore.setState({
+      nickname: 'PlayerC',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    renderTable();
+    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^start hand$/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('three-way idle: non-busted viewer sees Start Hand, not Rebuy', () => {
+    useRoomStore.getState().setRoomState(trioRoom);
+    useGameStore.getState().setGameState({
+      ...idleThreeWay,
+      viewerSeatIndex: 0,
+    });
+    useSessionStore.setState({
+      nickname: 'PlayerA',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    renderTable();
+    expect(screen.getByRole('button', { name: /^start hand$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rebuy/i })).not.toBeInTheDocument();
+  });
+
+  it('late joiner during active hand shows NEXT HAND and no actions', () => {
+    useRoomStore.getState().setRoomState(trioRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      viewerSeatIndex: 2,
+      seats: [
+        liveState.seats[0]!,
+        liveState.seats[1]!,
+        {
+          seatIndex: 2,
+          playerId: 'c',
+          nickname: 'PlayerC',
+          stack: 200,
+          currentBet: 0,
+          hasFolded: false,
+          isAllIn: false,
+          isSittingOut: true,
+          holeCards: null,
+          holeCardCount: null,
+        },
+      ],
+    });
+    useSessionStore.setState({
+      nickname: 'PlayerC',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    const { container } = renderTable();
+    expect(container.textContent).toMatch(/NEXT HAND/i);
+    expect(screen.queryByRole('button', { name: /^fold$/i })).not.toBeInTheDocument();
   });
 
   it('hides Start Hand and shows waiting-for-rebuy when one player is busted', () => {

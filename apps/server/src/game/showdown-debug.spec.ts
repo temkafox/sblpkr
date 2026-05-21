@@ -49,6 +49,7 @@ function sampleShowdownState(): {
   }
   const hand: HandState = Object.freeze({
     handId: 'hand-dbg',
+    participantSeatIndexes: Object.freeze([0, 1]),
     street: 'SHOWDOWN',
     deck: Object.freeze([]),
     boardCards: board,

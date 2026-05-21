@@ -141,10 +141,15 @@ export function syncTableToRoom(
     const member = room.players[i]!;
     const prior = playersById[member.playerId];
     if (prior == null) {
-      playersById[member.playerId] = createInitialPlayerState({
-        playerId: member.playerId,
-        seatIndex: i,
-        startingChips: DEFAULT_STARTING_CHIPS,
+      const waitingForNextHand =
+        hand != null && !hand.isComplete;
+      playersById[member.playerId] = Object.freeze({
+        ...createInitialPlayerState({
+          playerId: member.playerId,
+          seatIndex: i,
+          startingChips: DEFAULT_STARTING_CHIPS,
+        }),
+        isSittingOut: waitingForNextHand,
       });
     } else {
       playersById[member.playerId] = Object.freeze({
@@ -184,13 +189,19 @@ export function syncTableToRoom(
     seats: Object.freeze(seats),
   });
 
-  return applySeatEligibility(
+  let synced = applySeatEligibility(
     Object.freeze({
       table,
       hand: existing.hand,
       playersById: Object.freeze(playersById),
     }),
   );
+
+  if (hasActiveHandInProgress(synced)) {
+    synced = unstuckActiveSeat(synced);
+  }
+
+  return synced;
 }
 
 /** Players with chips > 0 who are seated and not sitting out. */

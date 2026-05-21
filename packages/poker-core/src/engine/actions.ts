@@ -16,8 +16,10 @@ import {
   InsufficientChipsError,
   InvalidActionError,
   InvalidTableStateError,
+  NotInHandError,
   OutOfTurnError,
 } from './errors';
+import { isHandParticipant } from './hand-participants';
 import { requireIntegerChipAmount } from './chip-amount';
 import { applyAggressiveBetMetadata, getMinimumRaiseTarget } from './min-raise';
 import { recordPublicSeatAction } from './public-seat-action';
@@ -45,6 +47,10 @@ export function applyAction(
 
   if (hand.showdownReady || hand.street === 'SHOWDOWN') {
     throw new InvalidTableStateError('Betting closed');
+  }
+
+  if (!isHandParticipant(state, seatIndex)) {
+    throw new NotInHandError('Player is not in the current hand');
   }
 
   const turn = state.table.activeSeatIndex;

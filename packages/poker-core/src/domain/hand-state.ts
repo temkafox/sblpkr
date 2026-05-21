@@ -11,6 +11,8 @@ export type LastPublicActionsBySeat = Readonly<
 
 export type HandState = {
   readonly handId: string;
+  /** Server seats dealt into this hand — frozen at startHand; late joiners are excluded. */
+  readonly participantSeatIndexes: readonly SeatIndex[];
   readonly street: Street;
   readonly deck: readonly Card[];
   readonly boardCards: readonly Card[];

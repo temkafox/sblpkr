@@ -622,6 +622,7 @@
 }
 
 .winner-tag {
+  z-index: 44;
   position: absolute;
   top: -10px;
   left: 50%;

@@ -4,6 +4,7 @@ import { ROOM_ERROR_CODES } from './room';
 
 export const GAME_ERROR_CODES = [
   'NOT_JOINED',
+  'NOT_IN_HAND',
   'HAND_NOT_STARTED',
   'TABLE_NOT_FOUND',
   'NOT_ENOUGH_PLAYERS',

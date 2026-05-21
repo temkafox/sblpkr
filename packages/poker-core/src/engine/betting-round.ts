@@ -3,6 +3,10 @@ import type { HandState } from '../domain/hand-state';
 import type { CoreGameState } from '../domain/game-state';
 import type { PlayerRuntimeState } from '../domain/player-state';
 import type { SeatIndex } from '../domain/seat';
+import {
+  getHandParticipantSeatIndexes,
+  isHandParticipant,
+} from './hand-participants';
 import { getPlayerAtSeat } from './seat-utils';
 
 export function appendActedSeat(
@@ -30,14 +34,14 @@ export function getContestantSeatIndexes(state: CoreGameState): SeatIndex[] {
   return getNonFoldedSeatIndexes(state);
 }
 
-/** Players who have not folded this hand (includes all-in; sitting out is not a fold). */
+/** Hand participants who have not folded (includes all-in; excludes late joiners). */
 
 export function getNonFoldedSeatIndexes(state: CoreGameState): SeatIndex[] {
   const out: SeatIndex[] = [];
-  for (const s of state.table.seats) {
-    const p = getPlayerAtSeat(state, s.seatIndex);
+  for (const seatIndex of getHandParticipantSeatIndexes(state)) {
+    const p = getPlayerAtSeat(state, seatIndex);
     if (p != null && !p.hasFolded) {
-      out.push(s.seatIndex);
+      out.push(seatIndex);
     }
   }
   return out;
@@ -69,6 +73,7 @@ export function needsToAct(state: CoreGameState, seat: SeatIndex): boolean {
   const hand = state.hand;
   if (hand == null || hand.isComplete) return false;
   if (hand.showdownReady || hand.street === 'SHOWDOWN') return false;
+  if (!isHandParticipant(state, seat)) return false;
 
   const p = getPlayerAtSeat(state, seat);
   if (p == null || p.hasFolded || p.isAllIn) return false;
@@ -81,8 +86,8 @@ export function needsToAct(state: CoreGameState, seat: SeatIndex): boolean {
 }
 
 export function anyNeedsToAct(state: CoreGameState): boolean {
-  for (const s of state.table.seats) {
-    if (needsToAct(state, s.seatIndex)) return true;
+  for (const seatIndex of getHandParticipantSeatIndexes(state)) {
+    if (needsToAct(state, seatIndex)) return true;
   }
   return false;
 }
@@ -149,9 +154,22 @@ export function advanceTurnAfterAction(state: CoreGameState): CoreGameState {
   const actor = state.table.activeSeatIndex;
   if (actor == null) return state;
 
+  if (!isHandParticipant(state, actor)) {
+    return Object.freeze({
+      ...state,
+      table: Object.freeze({
+        ...state.table,
+        activeSeatIndex: null,
+      }),
+    });
+  }
+
   const max = state.table.maxSeats;
   for (let step = 1; step <= max; step++) {
     const seat = (actor + step) % max;
+    if (!isHandParticipant(state, seat)) {
+      continue;
+    }
     if (needsToAct(state, seat)) {
       return Object.freeze({
         ...state,

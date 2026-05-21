@@ -79,6 +79,7 @@ function withStubHand(state: CoreGameState): CoreGameState {
   const stubPot = Object.freeze({ total: 0, sidePots: Object.freeze([]) });
   const stubHand: HandState = Object.freeze({
     handId: 'stub',
+    participantSeatIndexes: Object.freeze([0, 3]),
     street: 'PRE-FLOP',
     deck: Object.freeze([]),
     boardCards: Object.freeze([]),

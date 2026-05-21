@@ -66,6 +66,12 @@ export function makeLayout(idsByAngle: { id: string; angle: number; hero: boolea
   });
 }
 
+/**
+ * Visual seat slots (layout index 0 = hero at bottom) proceed clockwise around the
+ * table as server `seatIndex` increases from the viewer's server seat.
+ * {@link rotateSeatsClockwiseFromViewer} in gameStateAdapter applies this rotation.
+ */
+
 export const LAYOUTS: Record<SeatCount, SeatPosition[]> = {
   9: makeLayout(
     evenAngles(9).map((angle, i) => ({

@@ -51,8 +51,8 @@ function attachGatewayHandlers(io: Server, gateway: RoomGateway): void {
     socket.on(CLIENT_REGISTER_NICKNAME, (payload: unknown) => {
       gateway.handleRegisterNickname(socket, payload);
     });
-    socket.on(CLIENT_JOIN_ROOM, (payload: unknown) => {
-      void gateway.handleJoinRoom(socket, payload);
+    socket.on(CLIENT_JOIN_ROOM, async (payload: unknown) => {
+      await gateway.handleJoinRoom(socket, payload);
     });
     socket.on(CLIENT_SEND_CHAT_MESSAGE, (payload: unknown) => {
       gateway.handleSendChatMessage(socket, payload);
@@ -66,17 +66,24 @@ function attachGatewayHandlers(io: Server, gateway: RoomGateway): void {
   });
 }
 
+async function waitForConnect(client: ClientSocket): Promise<void> {
+  if (client.connected) {
+    return;
+  }
+  await new Promise<void>((resolve) => client.once('connect', () => resolve()));
+}
+
 async function joinPlayer(
   client: ClientSocket,
   roomId: string,
   nickname: string,
   clientSessionId: string,
 ): Promise<void> {
-  await new Promise<void>((resolve) => client.once('connect', () => resolve()));
+  await waitForConnect(client);
   client.emit(CLIENT_REGISTER_NICKNAME, { nickname, clientSessionId });
-  const state = waitForEvent(client, SERVER_ROOM_STATE);
+  const joined = waitForEvent(client, SERVER_ROOM_STATE);
   client.emit(CLIENT_JOIN_ROOM, { roomId, clientSessionId });
-  await state;
+  await joined;
 }
 
 describe('RoomGateway chat (Socket.IO)', () => {
@@ -138,7 +145,7 @@ describe('RoomGateway chat (Socket.IO)', () => {
   it('rejects unjoined socket', async () => {
     const room = roomService.createRoom();
     const outsider = connectClient(port);
-    await new Promise<void>((resolve) => outsider.once('connect', () => resolve()));
+    await waitForConnect(outsider);
 
     const err = waitForEvent<{ code: string }>(outsider, SERVER_ERROR);
     outsider.emit(CLIENT_SEND_CHAT_MESSAGE, {
@@ -197,7 +204,7 @@ describe('RoomGateway chat (Socket.IO)', () => {
     await joinPlayer(a, room.roomId, 'Alice', 'chat-req-a');
 
     const outsider = connectClient(port);
-    await new Promise<void>((resolve) => outsider.once('connect', () => resolve()));
+    await waitForConnect(outsider);
 
     const snapshotPromise = waitForEvent<{ messages: { text: string }[] }>(
       a,

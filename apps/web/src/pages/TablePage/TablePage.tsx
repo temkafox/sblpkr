@@ -13,6 +13,8 @@ import { RightSidebar } from '../../components/sidebar/RightSidebar';
 import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
+  canViewerRebuy,
+  canViewerStartHand,
   countEligibleForNextHand,
   createWaitingLiveTableView,
   resolveViewerServerSeatIndex,
@@ -148,21 +150,31 @@ export function TablePage() {
   }, [isLiveRoom, gameState, hasActiveHand, roomState, nickname]);
 
   const handActive = tableView.phase === 'hand';
-  const canStartHand =
-    isLiveRoom &&
-    connectionStatus === 'connected' &&
-    roomId != null &&
-    playerCount >= minPlayersToStart &&
-    enoughChipsForHand &&
-    !hasActiveHand;
-
+  const viewerStack = viewerSeatStack(gameState, viewerSeatIndex);
+  const startHandBase = {
+    isLiveRoom,
+    connectionStatus,
+    roomId: roomId ?? null,
+    playerCount,
+    minPlayersToStart,
+    eligibleForHand,
+    hasActiveHand,
+    viewerStack,
+  };
+  const canStartHand = canViewerStartHand(startHandBase);
   const canStartNextHand =
-    isLiveRoom &&
-    connectionStatus === 'connected' &&
-    roomId != null &&
-    playerCount >= minPlayersToStart &&
-    enoughChipsForHand &&
-    showHandResult;
+    showHandResult &&
+    canViewerStartHand({
+      ...startHandBase,
+      afterHandResult: true,
+    });
+  const canRebuy = canViewerRebuy({
+    isLiveRoom,
+    connectionStatus,
+    roomId: roomId ?? null,
+    handInProgress,
+    viewerStack,
+  });
 
   const waitingForPlayers =
     isLiveRoom && !hasActiveHand && playerCount < minPlayersToStart;
@@ -172,16 +184,9 @@ export function TablePage() {
     !handInProgress &&
     !handComplete &&
     playerCount >= minPlayersToStart &&
-    !enoughChipsForHand;
-
-  const viewerStack = viewerSeatStack(gameState, viewerSeatIndex);
-  const canRebuy =
-    isLiveRoom &&
-    connectionStatus === 'connected' &&
-    roomId != null &&
-    !handInProgress &&
+    !enoughChipsForHand &&
     viewerStack != null &&
-    viewerStack <= 0;
+    viewerStack > 0;
 
   const rebuyAmount = 200;
 

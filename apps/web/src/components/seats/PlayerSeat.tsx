@@ -3,6 +3,7 @@ import './Seats.css';
 import { Avatar } from './Avatar';
 import { OppHoles } from './OppHoles';
 import { formatChips } from '../../lib/formatChips';
+import { seatStatusLabel } from '../../lib/seatStatusLabel';
 import type { SeatPosition } from '../../lib/layout';
 import type { PlayerMock, SeatStateMock } from '../../mocks/tableMock';
 
@@ -19,6 +20,8 @@ function opponentStateClass(status: SeatStateMock['status']) {
     case 'sitout':
     case 'busted':
     case 'away':
+    case 'next_hand':
+    case 'waiting':
       return 'state-away';
     default:
       return '';
@@ -44,6 +47,8 @@ function opponentStatusClass(status: SeatStateMock['status']) {
     case 'sitout':
     case 'busted':
     case 'away':
+    case 'next_hand':
+    case 'waiting':
       return 't-away';
     case 'post_sb':
     case 'post_bb':
@@ -54,36 +59,7 @@ function opponentStatusClass(status: SeatStateMock['status']) {
 }
 
 function opponentStatusText(st: SeatStateMock): string {
-  switch (st.status) {
-    case 'turn':
-      return 'YOUR TURN';
-    case 'fold':
-      return 'FOLD';
-    case 'check':
-      return 'CHECK';
-    case 'call':
-      return st.bet ? `CALL $${formatChips(st.bet)}` : 'CALL';
-    case 'raise':
-      return `RAISE TO $${formatChips(st.bet || 0)}`;
-    case 'allin':
-      return 'ALL-IN';
-    case 'winner':
-      return 'WINNER';
-    case 'sitout':
-      return 'SITTING OUT';
-    case 'busted':
-      return 'BUSTED';
-    case 'away':
-      return 'AWAY';
-    case 'post_sb':
-      return st.bet ? `SB $${formatChips(st.bet)}` : 'SB';
-    case 'post_bb':
-      return st.bet ? `BB $${formatChips(st.bet)}` : 'BB';
-    case 'waiting':
-      return '';
-    default:
-      return '';
-  }
+  return seatStatusLabel(st);
 }
 
 export interface PlayerSeatProps {

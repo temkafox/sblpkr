@@ -35,6 +35,13 @@ export class InvalidActionError extends PokerCoreError {
   }
 }
 
+export class NotInHandError extends PokerCoreError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotInHandError';
+  }
+}
+
 export class OutOfTurnError extends PokerCoreError {
   constructor(message: string) {
     super(message);

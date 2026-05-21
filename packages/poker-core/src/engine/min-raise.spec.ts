@@ -23,6 +23,8 @@ function mkHand(
 ): HandState {
   return Object.freeze({
     handId: o.handId ?? 'unit-hand',
+    participantSeatIndexes:
+      o.participantSeatIndexes ?? Object.freeze([0, 1]),
     street: o.street ?? 'PRE-FLOP',
     deck: o.deck ?? Object.freeze([]),
     boardCards: o.boardCards ?? Object.freeze([]),

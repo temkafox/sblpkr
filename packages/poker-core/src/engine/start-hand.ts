@@ -105,6 +105,9 @@ export function startHand(
   };
 
   const dealOrder = getActiveSeatOrderClockwiseFrom(stateWithButton, sbSeat);
+  const participantSeatIndexes = Object.freeze(
+    [...new Set(dealOrder)].sort((a, b) => a - b),
+  );
   const holeByPlayer: Record<PlayerId, Card[]> = Object.create(null);
   for (const seat of dealOrder) {
     const pl = getPlayerAtSeat(stateWithButton, seat);
@@ -154,6 +157,7 @@ export function startHand(
 
   const hand: HandState = Object.freeze({
     handId: options.handId ?? 'hand-default',
+    participantSeatIndexes,
     street: 'PRE-FLOP',
     deck: remainingDeck,
     boardCards,

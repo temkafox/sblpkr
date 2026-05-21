@@ -1,4 +1,5 @@
 .hand-result-banner {
+  opacity: 0.95;
   position: absolute;
   left: 50%;
   top: 280px;

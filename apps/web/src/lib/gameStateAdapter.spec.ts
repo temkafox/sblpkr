@@ -14,10 +14,14 @@ import {
   orderOccupiedSeatsForViewer,
   orderRoomPlayersForViewer,
   resolveSeatNickname,
+  rotateSeatsClockwiseFromViewer,
+  canViewerRebuy,
+  canViewerStartHand,
   resolveSeatStatus,
   resolveViewerServerSeatIndex,
   shouldShowOppBackcards,
 } from './gameStateAdapter';
+import { seatStatusLabel } from './seatStatusLabel';
 
 function emptySeat(index: number): WireSeatView {
   return {
@@ -235,8 +239,9 @@ describe('gameStateAdapter', () => {
     expect(countEligibleForNextHand(idle, roomRoster)).toBe(1);
   });
 
-  it('orders room players with viewer first', () => {
+  it('orders room players with viewer first in clockwise seat order', () => {
     const ordered = orderRoomPlayersForViewer(roomRoster.players, 'ASD');
+    expect(ordered.map((p) => p.seatIndex)).toEqual([1, 0]);
     expect(ordered.map((p) => p.nickname)).toEqual(['ASD', 'ljhh']);
   });
 
@@ -454,6 +459,208 @@ describe('gameStateAdapter', () => {
     expect(active({ lastAction: { kind: 'post_bb', amount: 2 } })).toBe('post_bb');
   });
 
+  it('shows preflop blind bet chips from currentBet', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        street: 'PRE-FLOP',
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            currentBet: 1,
+            lastAction: { kind: 'post_sb', amount: 1 },
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            currentBet: 2,
+            lastAction: { kind: 'post_bb', amount: 2 },
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.bet).toBe(1);
+    expect(adapted.seatStatesBySeatIndex[1]?.bet).toBe(2);
+  });
+
+  it('clears seat bet chips after preflop when flop is dealt', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        street: 'FLOP',
+        boardCards: [
+          { r: '10', s: 'h' },
+          { r: 'J', s: 'c' },
+          { r: 'Q', s: 'd' },
+        ],
+        pot: { total: 3, sidePots: [] },
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            currentBet: 0,
+            lastAction: { kind: 'post_sb', amount: 1 },
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            currentBet: 0,
+            lastAction: { kind: 'post_bb', amount: 2 },
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.potAmount).toBe(3);
+    expect(adapted.seatStatesBySeatIndex[0]?.bet).toBe(0);
+    expect(adapted.seatStatesBySeatIndex[1]?.bet).toBe(0);
+  });
+
+  it('shows flop street bet chips from currentBet only', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        street: 'FLOP',
+        pot: { total: 23, sidePots: [] },
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            currentBet: 10,
+            lastAction: { kind: 'raise', amount: 10 },
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            currentBet: 0,
+            lastAction: { kind: 'call', amount: 10 },
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.bet).toBe(10);
+    expect(adapted.seatStatesBySeatIndex[1]?.bet).toBe(0);
+  });
+
+  it('clears flop bet chips when turn is dealt', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        street: 'TURN',
+        boardCards: [
+          { r: '10', s: 'h' },
+          { r: 'J', s: 'c' },
+          { r: 'Q', s: 'd' },
+          { r: '2', s: 's' },
+        ],
+        pot: { total: 33, sidePots: [] },
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            currentBet: 0,
+            lastAction: { kind: 'raise', amount: 10 },
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', {
+            currentBet: 0,
+            lastAction: { kind: 'call', amount: 10 },
+          }),
+          ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+        ],
+      }),
+      'Hero',
+      roomRoster,
+    );
+    expect(adapted.potAmount).toBe(33);
+    expect(adapted.seatStatesBySeatIndex.every((s) => s.bet === 0)).toBe(true);
+  });
+
+  it('maps late joiner not dealt into active hand to next_hand', () => {
+    expect(
+      resolveSeatStatus(
+        occupiedSeat(2, 'p-late', 'Late', {
+          holeCardCount: 0,
+          holeCards: null,
+          isSittingOut: true,
+        }),
+        0,
+        false,
+        true,
+      ),
+    ).toBe('next_hand');
+    expect(seatStatusLabel({ status: 'next_hand', bet: 0 })).toBe('NEXT HAND');
+  });
+
+  it('late joiner adapted view shows NEXT HAND and disabled action bar', () => {
+    const adapted = adaptPlayerGameState(
+      baseState({
+        viewerSeatIndex: 2,
+        activeSeatIndex: 0,
+        seats: [
+          occupiedSeat(0, 'p-hero', 'Hero', {
+            holeCardCount: 2,
+            holeCards: [
+              { r: 'A', s: 's' },
+              { r: 'K', s: 'h' },
+            ],
+          }),
+          occupiedSeat(1, 'p-villain', 'Villain', { holeCardCount: 2 }),
+          occupiedSeat(2, 'p-late', 'Late', {
+            stack: 200,
+            holeCardCount: 0,
+            holeCards: null,
+            isSittingOut: true,
+          }),
+          ...Array.from({ length: 6 }, (_, i) => emptySeat(i + 3)),
+        ],
+      }),
+      'Late',
+      roomRoster,
+    );
+    expect(adapted.seatStatesBySeatIndex[0]?.status).toBe('next_hand');
+    expect(seatStatusLabel(adapted.seatStatesBySeatIndex[0]!)).toBe('NEXT HAND');
+    expect(adapted.actionBar.actionsEnabled).toBe(false);
+  });
+
+  it('canViewerRebuy is viewer-specific and hidden during active hand', () => {
+    expect(
+      canViewerRebuy({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        handInProgress: true,
+        viewerStack: 0,
+      }),
+    ).toBe(false);
+    expect(
+      canViewerRebuy({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        handInProgress: false,
+        viewerStack: 0,
+      }),
+    ).toBe(true);
+    expect(
+      canViewerRebuy({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        handInProgress: false,
+        viewerStack: 200,
+      }),
+    ).toBe(false);
+  });
+
+  it('canViewerStartHand requires viewer chips; table eligibility is separate', () => {
+    const base = {
+      isLiveRoom: true,
+      connectionStatus: 'connected' as const,
+      roomId: 'r',
+      playerCount: 3,
+      minPlayersToStart: 2,
+      eligibleForHand: 2,
+      hasActiveHand: false,
+    };
+    expect(
+      canViewerStartHand({ ...base, viewerStack: 600 }),
+    ).toBe(true);
+    expect(
+      canViewerStartHand({ ...base, viewerStack: 0 }),
+    ).toBe(false);
+  });
+
   it('disconnected seat shows AWAY and not YOUR TURN during active hand', () => {
     expect(
       resolveSeatStatus(
@@ -650,6 +857,121 @@ describe('gameStateAdapter', () => {
     const ordered = orderOccupiedSeatsForViewer(seats, 0);
     expect(ordered).toHaveLength(2);
     expect(ordered[0]?.nickname).toBe('Hero');
+  });
+
+  describe('rotateSeatsClockwiseFromViewer', () => {
+    const threeSeats = [
+      occupiedSeat(0, 'p0', 'ASD'),
+      occupiedSeat(1, 'p1', '1234'),
+      occupiedSeat(2, 'p2', '2d2d'),
+    ];
+
+    function seatIndexes(ordered: WireSeatView[]): number[] {
+      return ordered.map((s) => s.seatIndex);
+    }
+
+    it('viewer 0 → [0, 1, 2]', () => {
+      expect(
+        seatIndexes(
+          rotateSeatsClockwiseFromViewer(threeSeats, (s) => s.seatIndex, 0),
+        ),
+      ).toEqual([0, 1, 2]);
+    });
+
+    it('viewer 1 → [1, 2, 0]', () => {
+      expect(
+        seatIndexes(
+          rotateSeatsClockwiseFromViewer(threeSeats, (s) => s.seatIndex, 1),
+        ),
+      ).toEqual([1, 2, 0]);
+    });
+
+    it('viewer 2 → [2, 0, 1]', () => {
+      expect(
+        seatIndexes(
+          rotateSeatsClockwiseFromViewer(threeSeats, (s) => s.seatIndex, 2),
+        ),
+      ).toEqual([2, 0, 1]);
+    });
+
+    it('sparse seats [0, 2, 5], viewer 2 → [2, 5, 0]', () => {
+      const sparse = [
+        occupiedSeat(0, 'p0', 'A'),
+        occupiedSeat(2, 'p2', 'B'),
+        occupiedSeat(5, 'p5', 'C'),
+      ];
+      expect(
+        seatIndexes(
+          rotateSeatsClockwiseFromViewer(sparse, (s) => s.seatIndex, 2),
+        ),
+      ).toEqual([2, 5, 0]);
+    });
+  });
+
+  it('remaps dealer badge to layout slot of server seat', () => {
+    const state = baseState({
+      viewerSeatIndex: 1,
+      dealerSeatIndex: 2,
+      smallBlindSeatIndex: 2,
+      bigBlindSeatIndex: 0,
+      seats: [
+        occupiedSeat(0, 'p0', 'P0'),
+        occupiedSeat(1, 'p1', 'P1'),
+        occupiedSeat(2, 'p2', 'P2'),
+        ...Array.from({ length: 6 }, (_, i) => emptySeat(i + 3)),
+      ],
+    });
+    const adapted = adaptPlayerGameState(state, 'P1', roomRoster);
+    expect(adapted.playersBySeatIndex.map((p) => p.name)).toEqual([
+      'P1',
+      'P2',
+      'P0',
+    ]);
+    expect(adapted.gameState.dealerSeatIndex).toBe(1);
+    expect(adapted.gameState.smallBlindSeatIndex).toBe(1);
+    expect(adapted.gameState.bigBlindSeatIndex).toBe(2);
+  });
+
+  it('remaps active seat to layout slot of server seat', () => {
+    const state = baseState({
+      viewerSeatIndex: 1,
+      activeSeatIndex: 0,
+      seats: [
+        occupiedSeat(0, 'p0', 'P0'),
+        occupiedSeat(1, 'p1', 'P1'),
+        ...Array.from({ length: 7 }, (_, i) => emptySeat(i + 2)),
+      ],
+    });
+    const adapted = adaptPlayerGameState(state, 'P1', roomRoster);
+    expect(adapted.gameState.activeSeatIndex).toBe(1);
+    expect(adapted.seatStatesBySeatIndex[1]?.status).toBe('turn');
+    expect(adapted.seatStatesBySeatIndex[0]?.status).not.toBe('turn');
+  });
+
+  it('lobby layout rotates by server seatIndex not nickname sort', () => {
+    const room: RoomStatePayload = {
+      roomId: 'room-1',
+      code: 'ABC',
+      maxSeats: 9,
+      status: 'waiting',
+      players: [
+        { playerId: 'p0', nickname: 'ASD', seatIndex: 0, connectionStatus: 'connected' },
+        { playerId: 'p1', nickname: '1234', seatIndex: 1, connectionStatus: 'connected' },
+        { playerId: 'p2', nickname: '2d2d', seatIndex: 2, connectionStatus: 'connected' },
+      ],
+    };
+    const asViewer1 = adaptRoomLobbyState(room, '1234');
+    expect(asViewer1.playersBySeatIndex.map((p) => p.name)).toEqual([
+      '1234',
+      '2d2d',
+      'ASD',
+    ]);
+    const asViewer2 = adaptRoomLobbyState(room, '2d2d');
+    expect(asViewer2.playersBySeatIndex.map((p) => p.name)).toEqual([
+      '2d2d',
+      'ASD',
+      '1234',
+    ]);
   });
 
   it('disables action bar when viewer is not active', () => {

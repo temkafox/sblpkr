@@ -107,6 +107,74 @@ export function countEligibleForNextHand(
   return playerCount;
 }
 
+/** Viewer has hole cards for the current hand (not a mid-hand joiner waiting). */
+export function isViewerDealtIntoHand(
+  state: PlayerGameState,
+  viewerSeatIndex: number,
+): boolean {
+  const seat = state.seats.find((s) => s.seatIndex === viewerSeatIndex);
+  if (seat?.playerId == null) {
+    return false;
+  }
+  return (
+    (seat.holeCardCount ?? 0) > 0 ||
+    (seat.holeCards != null && seat.holeCards.length > 0)
+  );
+}
+
+/** Viewer-specific: rebuy when busted and no betting street in progress. */
+export function canViewerRebuy(opts: {
+  readonly isLiveRoom: boolean;
+  readonly connectionStatus: string;
+  readonly roomId: string | null;
+  readonly handInProgress: boolean;
+  readonly viewerStack: number | null;
+}): boolean {
+  return (
+    opts.isLiveRoom &&
+    opts.connectionStatus === 'connected' &&
+    opts.roomId != null &&
+    !opts.handInProgress &&
+    opts.viewerStack != null &&
+    opts.viewerStack <= 0
+  );
+}
+
+/** Viewer-specific: start hand when viewer has chips and table has enough eligible players. */
+export function canViewerStartHand(opts: {
+  readonly isLiveRoom: boolean;
+  readonly connectionStatus: string;
+  readonly roomId: string | null;
+  readonly playerCount: number;
+  readonly minPlayersToStart: number;
+  readonly eligibleForHand: number;
+  readonly hasActiveHand: boolean;
+  readonly viewerStack: number | null;
+  readonly afterHandResult?: boolean;
+}): boolean {
+  const viewerHasChips =
+    opts.viewerStack != null && opts.viewerStack > 0;
+  const tableReady =
+    opts.playerCount >= opts.minPlayersToStart &&
+    opts.eligibleForHand >= opts.minPlayersToStart;
+
+  if (
+    !opts.isLiveRoom ||
+    opts.connectionStatus !== 'connected' ||
+    opts.roomId == null ||
+    !tableReady ||
+    !viewerHasChips
+  ) {
+    return false;
+  }
+
+  if (opts.afterHandResult) {
+    return opts.hasActiveHand;
+  }
+
+  return !opts.hasActiveHand;
+}
+
 function preHandMockGameState(preset: SeatCount): MockGameState {
   return {
     seats: preset,
@@ -185,26 +253,64 @@ export function resolveSeatNickname(
   return null;
 }
 
-export function orderRoomPlayersForViewer<
-  T extends { playerId: string; nickname: string },
->(players: readonly T[], viewerNickname: string | null): T[] {
-  if (players.length === 0) return [];
+/**
+ * Rotates seated entries sorted by ascending server seatIndex so the viewer is
+ * layout slot 0 (bottom hero). Higher seatIndexes map to clockwise visual slots.
+ */
+export function rotateSeatsClockwiseFromViewer<T>(
+  items: readonly T[],
+  seatIndexOf: (item: T) => number,
+  viewerServerSeatIndex: number,
+): T[] {
+  const sorted = [...items].sort((a, b) => seatIndexOf(a) - seatIndexOf(b));
+  const viewerIdx = sorted.findIndex(
+    (item) => seatIndexOf(item) === viewerServerSeatIndex,
+  );
+  if (viewerIdx < 0) {
+    return sorted;
+  }
+  return [...sorted.slice(viewerIdx), ...sorted.slice(0, viewerIdx)];
+}
 
-  const nick = viewerNickname?.trim().toLowerCase();
-  let viewerIdx = 0;
-  if (nick) {
-    const found = players.findIndex(
+export function resolveViewerRoomSeatIndex(
+  room: RoomStatePayload,
+  viewerNickname: string | null,
+): number | null {
+  if (viewerNickname) {
+    const nick = viewerNickname.trim().toLowerCase();
+    const byNick = room.players.find(
       (p) => p.nickname.trim().toLowerCase() === nick,
     );
-    if (found >= 0) viewerIdx = found;
+    if (byNick?.seatIndex != null) {
+      return byNick.seatIndex;
+    }
   }
+  const firstSeated = room.players.find((p) => p.seatIndex != null);
+  return firstSeated?.seatIndex ?? null;
+}
 
-  const viewer = players[viewerIdx]!;
-  const others = players
-    .filter((_, i) => i !== viewerIdx)
-    .sort((a, b) => a.nickname.localeCompare(b.nickname));
-
-  return [viewer, ...others];
+export function orderRoomPlayersForViewer<
+  T extends { playerId: string; nickname: string; seatIndex: number | null },
+>(players: readonly T[], viewerNickname: string | null): T[] {
+  const seated = players.filter((p) => p.seatIndex != null);
+  if (seated.length === 0) {
+    return [...players];
+  }
+  let viewerSeat = seated[0]!.seatIndex!;
+  if (viewerNickname) {
+    const nick = viewerNickname.trim().toLowerCase();
+    const match = seated.find(
+      (p) => p.nickname.trim().toLowerCase() === nick,
+    );
+    if (match?.seatIndex != null) {
+      viewerSeat = match.seatIndex;
+    }
+  }
+  return rotateSeatsClockwiseFromViewer(
+    seated,
+    (p) => p.seatIndex!,
+    viewerSeat,
+  );
 }
 
 /**
@@ -245,20 +351,17 @@ export function findViewerSeatIndex(
   return resolveViewerServerSeatIndex(state, viewerNickname);
 }
 
-/** Viewer first, then other occupied seats in server seat order. */
+/** Occupied seats rotated so viewer is layout slot 0; others follow clockwise. */
 export function orderOccupiedSeatsForViewer(
   seats: readonly WireSeatView[],
   viewerServerSeatIndex: number,
 ): WireSeatView[] {
   const occupied = seats.filter((s) => s.playerId != null);
-  const viewer = occupied.find((s) => s.seatIndex === viewerServerSeatIndex);
-  if (viewer == null) {
-    return [...occupied].sort((a, b) => a.seatIndex - b.seatIndex);
-  }
-  const others = occupied
-    .filter((s) => s.seatIndex !== viewer.seatIndex)
-    .sort((a, b) => a.seatIndex - b.seatIndex);
-  return [viewer, ...others];
+  return rotateSeatsClockwiseFromViewer(
+    occupied,
+    (s) => s.seatIndex,
+    viewerServerSeatIndex,
+  );
 }
 
 export function remapServerSeatToLayout(
@@ -279,11 +382,8 @@ export function shouldShowOppBackcards(
   return seat.holeCards == null || seat.holeCards.length === 0;
 }
 
+/** Current-street commitment only — not lastAction (persists for HUD labels). */
 function seatLabelBet(seat: WireSeatView): number {
-  const amount = seat.lastAction?.amount;
-  if (amount != null && amount > 0) {
-    return amount;
-  }
   return seat.currentBet;
 }
 
@@ -314,6 +414,9 @@ export function resolveSeatStatus(
   if (seat.connectionStatus === 'disconnected') {
     return 'away';
   }
+  const dealtIntoHand =
+    (seat.holeCardCount ?? 0) > 0 ||
+    (seat.holeCards != null && seat.holeCards.length > 0);
   if (hasActiveHand && !handComplete && activeSeatIndex === seat.seatIndex) {
     return 'turn';
   }
@@ -324,7 +427,7 @@ export function resolveSeatStatus(
     hasActiveHand &&
     !handComplete &&
     (seat.isAllIn ||
-      (seat.stack <= 0 && (seat.holeCardCount ?? 0) > 0))
+      (seat.stack <= 0 && dealtIntoHand))
   ) {
     return 'allin';
   }
@@ -338,6 +441,23 @@ export function resolveSeatStatus(
     if (kind === 'fold') return 'fold';
     if (kind === 'post_sb') return 'post_sb';
     if (kind === 'post_bb') return 'post_bb';
+  }
+
+  if (hasActiveHand && !handComplete && seat.isSittingOut) {
+    if (seat.stack > 0 && !dealtIntoHand) {
+      return 'next_hand';
+    }
+    return 'sitout';
+  }
+
+  if (
+    hasActiveHand &&
+    !handComplete &&
+    seat.playerId != null &&
+    seat.stack > 0 &&
+    !dealtIntoHand
+  ) {
+    return 'next_hand';
   }
 
   if (handComplete) {
@@ -426,7 +546,16 @@ export function adaptRoomLobbyState(
   viewerNickname: string | null,
   idleTableState: PlayerGameState | null = null,
 ): AdaptedTableView {
-  const ordered = orderRoomPlayersForViewer(room.players, viewerNickname);
+  const viewerSeat = resolveViewerRoomSeatIndex(room, viewerNickname);
+  const seated = room.players.filter((p) => p.seatIndex != null);
+  const ordered =
+    viewerSeat != null
+      ? rotateSeatsClockwiseFromViewer(
+          seated,
+          (p) => p.seatIndex!,
+          viewerSeat,
+        )
+      : [...seated].sort((a, b) => a.seatIndex! - b.seatIndex!);
   const occupiedCount = ordered.length;
   const preset = occupiedCountToLayoutPreset(occupiedCount);
   const layout = LAYOUTS[preset].slice(0, occupiedCount);
@@ -473,8 +602,11 @@ function buildActionBar(
   viewerServerSeatIndex: number,
 ): ActionBarMock {
   const actions = state.availableActions;
+  const dealtIn = isViewerDealtIntoHand(state, viewerServerSeatIndex);
   const isViewerTurn =
-    actions != null && state.activeSeatIndex === viewerServerSeatIndex;
+    dealtIn &&
+    actions != null &&
+    state.activeSeatIndex === viewerServerSeatIndex;
 
   return {
     potAmount: state.pot.total,

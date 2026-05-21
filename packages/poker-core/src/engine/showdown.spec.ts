@@ -30,6 +30,8 @@ function totalPlayerWealth(state: CoreGameState): number {
 function makeHand(base: Partial<HandState> & { handId: string; street: HandState['street'] }): HandState {
   const pots = base.pots ?? Object.freeze({ total: 0, sidePots: Object.freeze([]) });
   return Object.freeze({
+    participantSeatIndexes:
+      base.participantSeatIndexes ?? Object.freeze([0, 1]),
     deck: Object.freeze([]),
     boardCards: Object.freeze([]),
     currentBet: 0,
@@ -114,6 +116,9 @@ function buildShowdownGame(opts: {
     actedSeatIndexes: patch.actedSeatIndexes ?? Object.freeze([]),
     raiseFrozenSeatIndexes:
       patch.raiseFrozenSeatIndexes ?? Object.freeze([]),
+    participantSeatIndexes:
+      patch.participantSeatIndexes ??
+      Object.freeze(opts.players.map((p) => p.seatIndex)),
     showdownReady: patch.showdownReady ?? true,
     isComplete: patch.isComplete ?? false,
   });
@@ -626,6 +631,8 @@ describe('returnableUncalled fold-win integration', () => {
       actedSeatIndexes: Object.freeze([]),
       lastPublicActionsBySeat: Object.freeze({}),
       raiseFrozenSeatIndexes: Object.freeze([]),
+      participantSeatIndexes: Object.freeze([1, 3]),
+      pots: Object.freeze({ total: 200, sidePots: Object.freeze([]) }),
       showdownReady: false,
       isComplete: true,
     });

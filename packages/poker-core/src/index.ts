@@ -40,6 +40,7 @@ export {
   InsufficientChipsError,
   NoEligibleWinnersError,
   NotEnoughPlayersError,
+  NotInHandError,
   OutOfTurnError,
   PokerCoreError,
   PotDistributionError,
@@ -119,6 +120,11 @@ export {
   isContestantInCurrentHand,
   needsToAct,
 } from './engine/betting-round';
+
+export {
+  getHandParticipantSeatIndexes,
+  isHandParticipant,
+} from './engine/hand-participants';
 
 export type { SeatChipSlice, SidePot } from '@neonpoker/shared';
 

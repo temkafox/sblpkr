@@ -47,7 +47,7 @@ describe('ChatPanel', () => {
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onSend).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Send message')).toBeDisabled();
+    expect(within(container).getByLabelText('Send message')).toBeDisabled();
   });
 
   it('disables send when message exceeds max length', () => {
@@ -59,7 +59,7 @@ describe('ChatPanel', () => {
     fireEvent.change(input, {
       target: { value: 'x'.repeat(CHAT_MESSAGE_MAX_LENGTH + 1) },
     });
-    expect(screen.getByLabelText('Send message')).toBeDisabled();
+    expect(within(container).getByLabelText('Send message')).toBeDisabled();
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onSend).not.toHaveBeenCalled();
   });

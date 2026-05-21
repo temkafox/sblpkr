@@ -6,6 +6,7 @@ import {
   InvalidActionError,
   InvalidTableStateError,
   NotEnoughPlayersError,
+  NotInHandError,
   OutOfTurnError,
   PokerCoreError,
   SeatNotFoundError,
@@ -24,6 +25,10 @@ export function mapToSocketErrorCode(err: unknown): {
       code: err.code as SocketErrorCode,
       message: err.message,
     };
+  }
+
+  if (err instanceof NotInHandError) {
+    return { code: 'NOT_IN_HAND', message: err.message };
   }
 
   if (err instanceof OutOfTurnError) {

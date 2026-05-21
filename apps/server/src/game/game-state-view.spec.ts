@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  advanceStreet,
   applyAction,
+  canAdvanceStreet,
   createInitialGameState,
   createSeededRandom,
+  getAvailableActions,
   startHand,
 } from '@neonpoker/poker-core';
 import { PlayerGameStateSchema, PublicGameStateSchema } from '@neonpoker/shared';
@@ -145,6 +148,37 @@ describe('game-state-view (Phase 6C2)', () => {
     const view = toPlayerGameState(state, seat, sampleRoom());
     expect(view.street).toBe('PRE-FLOP');
     expect(view.pot.total).toBeGreaterThan(0);
+  });
+
+  it('zeros wire seat currentBet after street advance while pot keeps commitments', () => {
+    let state = huState();
+    const sbIdx = state.table.smallBlindSeatIndex!;
+    const bbIdx = state.table.bigBlindSeatIndex!;
+    const sbId = state.table.seats[sbIdx]!.playerId!;
+    const bbId = state.table.seats[bbIdx]!.playerId!;
+
+    while (!canAdvanceStreet(state)) {
+      const seat = state.table.activeSeatIndex!;
+      const available = getAvailableActions(state, seat);
+      state = applyAction(
+        state,
+        seat,
+        available.canCheck ? { kind: 'check' } : { kind: 'call' },
+      );
+    }
+    state = advanceStreet(state);
+
+    const view = PlayerGameStateSchema.parse(
+      toPlayerGameState(state, sbIdx, sampleRoom()),
+    );
+
+    expect(view.street).toBe('FLOP');
+    expect(view.pot.total).toBeGreaterThan(0);
+    expect(view.seats[sbIdx]!.currentBet).toBe(0);
+    expect(view.seats[bbIdx]!.currentBet).toBe(0);
+    expect(state.playersById[sbId]!.totalCommitted).toBeGreaterThan(0);
+    expect(state.playersById[bbId]!.totalCommitted).toBeGreaterThan(0);
+    expect(view.seats[sbIdx]!.lastAction?.amount).toBeGreaterThan(0);
   });
 
   it('exposes lastAction on wire after betting actions', () => {

@@ -69,7 +69,9 @@ describe('applyAction', () => {
   it('throws OutOfTurnError when seat is wrong', () => {
     const g = huStarted();
     const actor = g.table.activeSeatIndex!;
-    const cheat = (actor + 1) % g.table.maxSeats;
+    const cheat = g.table.seats.find(
+      (s) => s.playerId != null && s.seatIndex !== actor,
+    )!.seatIndex;
     expect(() => applyAction(g, cheat, { kind: 'fold' })).toThrow(OutOfTurnError);
   });
 

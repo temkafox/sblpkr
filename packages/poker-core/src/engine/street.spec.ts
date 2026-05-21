@@ -98,6 +98,8 @@ describe('advanceStreet', () => {
     expect(flop.hand?.deck.length).toBe(deckLenBefore - 3);
     expect(flop.playersById.utg?.currentBet).toBe(0);
     expect(flop.playersById.utg?.totalCommitted).toBe(g.playersById.utg!.totalCommitted);
+    expect(flop.hand?.pots.total).toBeGreaterThan(0);
+    expect(flop.hand?.currentBet).toBe(0);
     expect(flop.hand?.actedSeatIndexes).toHaveLength(0);
     expect(flop.hand?.raiseFrozenSeatIndexes).toHaveLength(0);
     expect(flop.hand?.lastAggressorSeatIndex).toBeNull();

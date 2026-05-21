@@ -1,6 +1,7 @@
 import type { CoreGameState } from '../domain/game-state';
 import type { SeatIndex } from '../domain/seat';
 
+import { isHandParticipant } from './hand-participants';
 import { getMaximumRaiseTarget, getMinimumRaiseTarget } from './min-raise';
 import { getPlayerAtSeat } from './seat-utils';
 
@@ -35,6 +36,8 @@ export function getAvailableActions(
   const hand = state.hand;
   if (hand == null || hand.isComplete) return DISABLED;
   if (hand.showdownReady || hand.street === 'SHOWDOWN') return DISABLED;
+
+  if (!isHandParticipant(state, seatIndex)) return DISABLED;
 
   const turn = state.table.activeSeatIndex;
   if (turn == null || turn !== seatIndex) return DISABLED;
