@@ -84,24 +84,27 @@ export function HeroSeat({
   const states = heroStateClass(st.status);
 
   return (
-    <div className={`seat hero ${states}`} style={{ left: pos.x, top: pos.y, width: w, height: h }}>
+    <div
+      className={`seat hero ${states}${showRebuy ? ' seat--has-rebuy' : ''}`}
+      style={{ left: pos.x, top: pos.y, width: w, height: h }}
+    >
       {holeCards ? <HeroHoleCards cards={holeCards} /> : null}
       <div className="body">
         <div className="body-inner">
           <div className="name">{player.name}</div>
           <div className="stack">${formatChips(player.stack)}</div>
           <div className={`status ${heroStatusClass(st.status)}`}>{heroStatusText(st)}</div>
-          {showRebuy ? (
-            <button
-              type="button"
-              className="seat-rebuy-btn"
-              onClick={onRebuy}
-              disabled={rebuyDisabled}
-            >
-              Rebuy ${formatChips(rebuyAmount)}
-            </button>
-          ) : null}
         </div>
+        {showRebuy ? (
+          <button
+            type="button"
+            className="seat-rebuy-btn"
+            onClick={onRebuy}
+            disabled={rebuyDisabled}
+          >
+            Rebuy ${formatChips(rebuyAmount)}
+          </button>
+        ) : null}
         <div className="timer">
           <div className="bar" key={`${player.id}-${st.status}`} />
         </div>

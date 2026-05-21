@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createSeededRandom, getPlayerAtSeat } from '@neonpoker/poker-core';
+import {
+  createSeededRandom,
+  getPlayerAtSeat,
+  type Card,
+} from '@neonpoker/poker-core';
 import type { HandResultPayload } from '@neonpoker/shared';
 
 import { RoomService } from '../room/room.service';
@@ -25,6 +29,8 @@ function seatRoom(roomService: RoomService, count: number): string {
   }
   return room.roomId;
 }
+
+const card = (r: Card['r'], s: Card['s']): Card => Object.freeze({ r, s });
 
 describe('GameService.rebuy (Phase 7G)', () => {
   it('restores busted player to DEFAULT_REBUY_CHIPS without changing others', () => {
@@ -89,12 +95,12 @@ describe('GameService.rebuy (Phase 7G)', () => {
     const bustedId = room.players[1]!.playerId;
 
     let state = game.startHand(roomId);
-    const board = Object.freeze([
-      { r: 'A', s: 's' },
-      { r: 'K', s: 'h' },
-      { r: 'Q', s: 'd' },
-      { r: 'J', s: 'c' },
-      { r: '10', s: 's' },
+    const board: readonly Card[] = Object.freeze([
+      card('A', 's'),
+      card('K', 'h'),
+      card('Q', 'd'),
+      card('J', 'c'),
+      card('10', 's'),
     ]);
     state = Object.freeze({
       ...state,

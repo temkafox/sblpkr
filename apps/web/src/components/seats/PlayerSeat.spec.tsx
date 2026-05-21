@@ -41,4 +41,22 @@ describe('PlayerSeat', () => {
     expect(seat.querySelector('.stack')?.textContent).toBe('$350');
     expect(screen.getByText('ALL-IN')).toBeInTheDocument();
   });
+
+  it('does not render Rebuy on busted opponent seat', () => {
+    const { container } = render(
+      <PlayerSeat
+        player={{ ...player, stack: 0 }}
+        state={{
+          status: 'busted',
+          bet: 0,
+          showOppBackcards: false,
+        }}
+        position={oppPos}
+        showHoles={false}
+      />,
+    );
+
+    expect(container.querySelector('.seat-rebuy-btn')).toBeNull();
+    expect(container.querySelector('.seat.hero')).toBeNull();
+  });
 });
