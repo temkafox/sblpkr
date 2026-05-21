@@ -18,6 +18,7 @@ vi.mock('../../net/socket', () => ({
   requestChatMessages: vi.fn(),
   sendChatMessage: vi.fn(),
   startHand: vi.fn(),
+  setNextHandReady: vi.fn(),
   rebuy: vi.fn(),
   sendPlayerAction: vi.fn(),
   onGameState: vi.fn(() => () => {}),
@@ -902,7 +903,7 @@ describe('TablePage live room', () => {
     ).toMatch(/not enough players with chips/i);
   });
 
-  it('Start Next Hand emits startHand when hand is complete', () => {
+  it('ready panel renders eligible players after hand completes', () => {
     useRoomStore.getState().setRoomState(duoRoom);
     useGameStore.getState().setGameState({
       ...liveState,
@@ -910,15 +911,182 @@ describe('TablePage live room', () => {
       street: 'SHOWDOWN',
       activeSeatIndex: null,
     });
-    useGameStore.getState().setHandResult({
-      handId: 'hand-1',
-      winnerSeatIndexes: [0],
-      awardedAmountsBySeatIndex: { '0': 15 },
-      totalAwarded: 15,
+    useGameStore.getState().setNextHandReadyState({
+      roomId,
+      eligiblePlayers: [
+        {
+          playerId: 'a',
+          nickname: 'ljhh',
+          seatIndex: 0,
+          isReady: false,
+        },
+        {
+          playerId: 'b',
+          nickname: 'ASD',
+          seatIndex: 1,
+          isReady: true,
+        },
+      ],
+      readyCount: 1,
+      requiredCount: 2,
     });
     renderTable();
-    fireEvent.click(screen.getByRole('button', { name: /start next hand/i }));
-    expect(socket.startHand).toHaveBeenCalledWith(roomId);
+    expect(screen.getByRole('heading', { name: /next hand/i })).toBeInTheDocument();
+    const sidebar = document.querySelector('.np-sidebar');
+    expect(sidebar?.textContent).toMatch(/ljhh/);
+    expect(sidebar?.textContent).toMatch(/ASD/);
+    expect(screen.queryByRole('button', { name: /start next hand/i })).not.toBeInTheDocument();
+  });
+
+  it('eligible viewer can click Ready for next hand', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+    });
+    useGameStore.getState().setNextHandReadyState({
+      roomId,
+      eligiblePlayers: [
+        {
+          playerId: 'a',
+          nickname: 'ljhh',
+          seatIndex: 0,
+          isReady: false,
+        },
+        {
+          playerId: 'b',
+          nickname: 'ASD',
+          seatIndex: 1,
+          isReady: false,
+        },
+      ],
+      readyCount: 0,
+      requiredCount: 2,
+    });
+    renderTable();
+    fireEvent.click(
+      screen.getByRole('button', { name: /ready for next hand/i }),
+    );
+    expect(socket.setNextHandReady).toHaveBeenCalledWith(roomId);
+  });
+
+  it('ready button becomes waiting after viewer is ready', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+    });
+    useGameStore.getState().setNextHandReadyState({
+      roomId,
+      eligiblePlayers: [
+        {
+          playerId: 'a',
+          nickname: 'ljhh',
+          seatIndex: 0,
+          isReady: true,
+        },
+        {
+          playerId: 'b',
+          nickname: 'ASD',
+          seatIndex: 1,
+          isReady: false,
+        },
+      ],
+      readyCount: 1,
+      requiredCount: 2,
+    });
+    renderTable();
+    expect(
+      screen.getByRole('button', { name: /ready — waiting/i }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: /ready for next hand/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('busted viewer sees Rebuy instead of Ready during ready phase', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...liveState,
+      viewerSeatIndex: 1,
+      handComplete: true,
+      street: 'SHOWDOWN',
+      activeSeatIndex: null,
+      seats: [
+        { ...liveState.seats[0]!, stack: 400 },
+        {
+          ...liveState.seats[1]!,
+          stack: 0,
+          isSittingOut: true,
+        },
+      ],
+    });
+    useGameStore.getState().setNextHandReadyState({
+      roomId,
+      eligiblePlayers: [
+        {
+          playerId: 'a',
+          nickname: 'ljhh',
+          seatIndex: 0,
+          isReady: false,
+        },
+      ],
+      readyCount: 0,
+      requiredCount: 1,
+    });
+    useSessionStore.setState({
+      nickname: 'ASD',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    renderTable();
+    expect(screen.getByRole('button', { name: /rebuy \$200/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /ready for next hand/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('after rebuy viewer sees Ready when added to eligible list', () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    useGameStore.getState().setGameState({
+      ...idlePreHandState,
+      seats: [
+        { ...idlePreHandState.seats[0]!, stack: 400 },
+        { ...idlePreHandState.seats[1]!, stack: 200, isSittingOut: false },
+      ],
+    });
+    useGameStore.getState().setNextHandReadyState({
+      roomId,
+      eligiblePlayers: [
+        {
+          playerId: 'a',
+          nickname: 'ljhh',
+          seatIndex: 0,
+          isReady: true,
+        },
+        {
+          playerId: 'b',
+          nickname: 'ASD',
+          seatIndex: 1,
+          isReady: false,
+        },
+      ],
+      readyCount: 1,
+      requiredCount: 2,
+    });
+    useSessionStore.setState({
+      nickname: 'ASD',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    renderTable();
+    expect(
+      screen.getByRole('button', { name: /ready for next hand/i }),
+    ).toBeInTheDocument();
   });
 
   it('clears handResult when new SERVER_GAME_STATE starts next hand', () => {

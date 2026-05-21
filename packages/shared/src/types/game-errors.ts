@@ -11,6 +11,8 @@ export const GAME_ERROR_CODES = [
   'HAND_ALREADY_ACTIVE',
   'NOT_BUSTED',
   'HAND_IN_PROGRESS',
+  'NEXT_HAND_NOT_WAITING',
+  'NOT_ELIGIBLE_FOR_READY',
 ] as const;
 
 export type GameErrorCode = (typeof GAME_ERROR_CODES)[number];

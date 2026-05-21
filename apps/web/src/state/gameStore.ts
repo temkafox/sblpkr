@@ -1,6 +1,7 @@
 import type {
   HandHistoryPayload,
   HandResultPayload,
+  NextHandReadyStatePayload,
   PlayerGameState,
 } from '@neonpoker/shared';
 import { create } from 'zustand';
@@ -24,6 +25,7 @@ function shouldClearHandResultOnGameState(
 type GameState = {
   gameState: PlayerGameState | null;
   handResult: HandResultPayload | null;
+  nextHandReadyState: NextHandReadyStatePayload | null;
   handHistory: HandHistoryStreet[];
   handHistoryRevision: number | null;
   isGameLoading: boolean;
@@ -31,6 +33,7 @@ type GameState = {
   gameError: string | null;
   setGameState: (state: PlayerGameState) => void;
   setHandResult: (result: HandResultPayload) => void;
+  setNextHandReadyState: (state: NextHandReadyStatePayload) => void;
   setHandHistory: (payload: HandHistoryPayload) => void;
   setGameLoading: (loading: boolean) => void;
   setSubmittingAction: (submitting: boolean) => void;
@@ -43,6 +46,7 @@ type GameState = {
 export const useGameStore = create<GameState>((set) => ({
   gameState: null,
   handResult: null,
+  nextHandReadyState: null,
   handHistory: [],
   handHistoryRevision: null,
   isGameLoading: false,
@@ -59,6 +63,7 @@ export const useGameStore = create<GameState>((set) => ({
       gameError: null,
     })),
   setHandResult: (handResult) => set({ handResult }),
+  setNextHandReadyState: (nextHandReadyState) => set({ nextHandReadyState }),
   setHandHistory: (payload) =>
     set((prev) => {
       if (
@@ -83,6 +88,7 @@ export const useGameStore = create<GameState>((set) => ({
     set({
       gameState: null,
       handResult: null,
+      nextHandReadyState: null,
       handHistory: [],
       handHistoryRevision: null,
       isGameLoading: false,

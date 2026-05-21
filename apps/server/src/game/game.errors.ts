@@ -6,7 +6,9 @@ export type GameErrorCode =
   | 'HAND_ALREADY_ACTIVE'
   | 'NOT_JOINED'
   | 'NOT_BUSTED'
-  | 'HAND_IN_PROGRESS';
+  | 'HAND_IN_PROGRESS'
+  | 'NEXT_HAND_NOT_WAITING'
+  | 'NOT_ELIGIBLE_FOR_READY';
 
 export class GameOrchestrationError extends Error {
   readonly code: GameErrorCode;

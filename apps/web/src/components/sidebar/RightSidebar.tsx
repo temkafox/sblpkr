@@ -3,6 +3,8 @@ import './Sidebar.css';
 import { ChatPanel } from './ChatPanel';
 import { GameInfoPanel } from './GameInfoPanel';
 import { HandHistoryPanel } from './HandHistoryPanel';
+import { NextHandPanel } from './NextHandPanel';
+import type { NextHandReadyStatePayload } from '@neonpoker/shared';
 import type { ChatMessageMock, GameInfoMock, HandHistoryStreet } from '../../mocks/tableMock';
 
 export interface RightSidebarProps {
@@ -11,6 +13,7 @@ export interface RightSidebarProps {
   chatDisabled: boolean;
   chatError: string | null;
   onSendChat: (text: string) => void;
+  nextHandReady: NextHandReadyStatePayload | null;
   gameInfo: GameInfoMock;
 }
 
@@ -20,6 +23,7 @@ export function RightSidebar({
   chatDisabled,
   chatError,
   onSendChat,
+  nextHandReady,
   gameInfo,
 }: RightSidebarProps) {
   return (
@@ -31,6 +35,9 @@ export function RightSidebar({
         error={chatError}
         onSend={onSendChat}
       />
+      {nextHandReady != null && nextHandReady.requiredCount > 0 ? (
+        <NextHandPanel readyState={nextHandReady} />
+      ) : null}
       <GameInfoPanel info={gameInfo} />
     </aside>
   );

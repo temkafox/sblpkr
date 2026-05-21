@@ -17,6 +17,7 @@ import {
   CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_SEND_CHAT_MESSAGE,
+  CLIENT_SET_NEXT_HAND_READY,
   CLIENT_START_HAND,
   RequestChatMessagesPayloadSchema,
   RequestHandHistoryPayloadSchema,
@@ -25,15 +26,18 @@ import {
   PlayerActionPayloadSchema,
   RebuyPayloadSchema,
   RequestGameStatePayloadSchema,
+  SetNextHandReadyPayloadSchema,
   StartHandPayloadSchema,
   SERVER_ERROR,
   SERVER_GAME_STATE,
+  SERVER_NEXT_HAND_READY_STATE,
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
 import type { SocketErrorCode } from '@neonpoker/shared';
 import type { Server, Socket } from 'socket.io';
 
 import { GameBroadcastService } from '../game/game-broadcast';
+import { NextHandReadyService } from '../game/next-hand-ready.service';
 import { GameService } from '../game/game.service';
 import { mapToSocketErrorCode } from '../game/poker-core-error-map';
 import {
@@ -56,6 +60,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     private readonly roomService: RoomService,
     private readonly gameService: GameService,
     private readonly gameBroadcast: GameBroadcastService,
+    private readonly nextHandReady: NextHandReadyService,
     private readonly chatService: ChatService,
   ) {}
 
@@ -155,6 +160,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
       this.broadcastRoomState(roomId);
       this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
       this.gameBroadcast.emitHandHistoryToRoom(this.server, roomId);
+      this.syncNextHandReadyAfterEligibilityChange(roomId);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
@@ -289,9 +295,63 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
       return;
     }
 
+    if (this.nextHandReady.isPhaseActive(roomId)) {
+      this.emitError(
+        client,
+        'NEXT_HAND_NOT_WAITING',
+        'Use ready check for the next hand — all eligible players must ready up',
+      );
+      return;
+    }
+
     try {
       const state = this.gameService.startHand(roomId);
       this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+    } catch (err) {
+      const mapped = mapToSocketErrorCode(err);
+      this.emitError(client, mapped.code, mapped.message);
+    }
+  }
+
+  @SubscribeMessage(CLIENT_SET_NEXT_HAND_READY)
+  handleSetNextHandReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): void {
+    const parsed = SetNextHandReadyPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      this.emitError(
+        client,
+        'INVALID_PAYLOAD',
+        parsed.error.issues[0]?.message ?? 'Invalid ready payload',
+      );
+      return;
+    }
+
+    const roomId = this.resolveRoomId(parsed.data.roomId);
+    if (roomId == null) {
+      this.emitError(client, 'ROOM_NOT_FOUND', 'Room not found');
+      return;
+    }
+
+    const session = this.roomService.getSession(client.id);
+    if (
+      session?.playerId == null ||
+      !this.roomService.isSocketInRoom(client.id, roomId)
+    ) {
+      this.emitError(client, 'NOT_JOINED', 'Join the room before readying up');
+      return;
+    }
+
+    try {
+      const { payload: readyPayload, shouldStart } = this.nextHandReady.markReady(
+        roomId,
+        session.playerId,
+      );
+      this.server.to(roomId).emit(SERVER_NEXT_HAND_READY_STATE, readyPayload);
+      if (shouldStart) {
+        this.startNextHandFromReadyPhase(roomId);
+      }
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
@@ -376,6 +436,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
       client.emit(SERVER_GAME_STATE, view);
       this.gameBroadcast.emitHandResultToClient(client, roomId, state);
       this.gameBroadcast.emitHandHistoryToClient(client, roomId);
+      this.gameBroadcast.emitNextHandReadyToClient(client, roomId);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
@@ -425,6 +486,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
   private afterRoomMembershipChange(roomId: string): void {
     this.broadcastRoomState(roomId);
     if (this.gameService.abortHandIfInsufficientPlayers(roomId)) {
+      this.gameBroadcast.clearNextHandReadyPhase(this.server, roomId);
       this.gameBroadcast.emitWaitingGameStateToRoom(this.server, roomId);
       return;
     }
@@ -432,10 +494,39 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     const state = this.gameService.reconcileAfterRosterChange(roomId);
     if (state != null) {
       this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      this.syncNextHandReadyAfterEligibilityChange(roomId);
       return;
     }
 
     this.broadcastIdleTableStateIfNoHand(roomId);
+    this.syncNextHandReadyAfterEligibilityChange(roomId);
+  }
+
+  private syncNextHandReadyAfterEligibilityChange(roomId: string): void {
+    if (!this.nextHandReady.isPhaseActive(roomId)) {
+      return;
+    }
+    const payload = this.nextHandReady.onEligibilityChanged(roomId);
+    if (payload == null) {
+      return;
+    }
+    this.server.to(roomId).emit(SERVER_NEXT_HAND_READY_STATE, payload);
+    if (
+      payload.requiredCount >= 2 &&
+      payload.readyCount >= payload.requiredCount
+    ) {
+      this.startNextHandFromReadyPhase(roomId);
+    }
+  }
+
+  private startNextHandFromReadyPhase(roomId: string): void {
+    try {
+      const state = this.gameService.startHand(roomId);
+      this.gameBroadcast.clearNextHandReadyPhase(this.server, roomId);
+      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+    } catch {
+      this.gameBroadcast.emitNextHandReadyToRoom(this.server, roomId);
+    }
   }
 
   /** Keeps idle lobby stacks aligned when roster grows before the first hand. */

@@ -9,6 +9,7 @@ import {
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REQUEST_GAME_STATE,
   CLIENT_REBUY,
+  CLIENT_SET_NEXT_HAND_READY,
   CLIENT_START_HAND,
   PlayerActionPayloadSchema,
   PlayerGameStateSchema,
@@ -26,6 +27,7 @@ import { ChatService } from '../chat/chat.service';
 import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameBroadcastService } from './game-broadcast';
 import { HandHistoryService } from './hand-history.service';
+import { NextHandReadyService } from './next-hand-ready.service';
 import { GameService } from './game.service';
 import { containsPrivateEngineFields } from './game-state-view';
 import { RoomGateway } from '../room/room.gateway';
@@ -70,6 +72,9 @@ function attachGatewayHandlers(io: Server, gateway: RoomGateway): void {
     socket.on(CLIENT_START_HAND, (payload: unknown) => {
       gateway.handleStartHand(socket, payload);
     });
+    socket.on(CLIENT_SET_NEXT_HAND_READY, (payload: unknown) => {
+      gateway.handleSetNextHandReady(socket, payload);
+    });
     socket.on(CLIENT_REBUY, (payload: unknown) => {
       gateway.handleRebuy(socket, payload);
     });
@@ -109,15 +114,18 @@ describe('Game gateway (Phase 6C2)', () => {
       rng: () => createSeededRandom(`6c2-gw-${seq}`),
     });
     const handHistory = new HandHistoryService();
+    const nextHandReady = new NextHandReadyService(roomService, tableService);
     const gameBroadcast = new GameBroadcastService(
       roomService,
       tableService,
       handHistory,
+      nextHandReady,
     );
     gateway = new RoomGateway(
       roomService,
       gameService,
       gameBroadcast,
+      nextHandReady,
       new ChatService(),
     );
     gateway.onModuleInit();

@@ -15,6 +15,7 @@ import {
   orderRoomPlayersForViewer,
   resolveSeatNickname,
   rotateSeatsClockwiseFromViewer,
+  canViewerMarkNextHandReady,
   canViewerRebuy,
   canViewerStartHand,
   resolveSeatStatus,
@@ -658,6 +659,43 @@ describe('gameStateAdapter', () => {
     ).toBe(true);
     expect(
       canViewerStartHand({ ...base, viewerStack: 0 }),
+    ).toBe(false);
+  });
+
+  it('canViewerMarkNextHandReady when listed and not yet ready', () => {
+    const readyState = {
+      roomId: 'r',
+      eligiblePlayers: [
+        {
+          playerId: 'p1',
+          nickname: 'Hero',
+          seatIndex: 0,
+          isReady: false,
+        },
+      ],
+      readyCount: 0,
+      requiredCount: 1,
+    };
+    expect(
+      canViewerMarkNextHandReady({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        readyState,
+        viewerPlayerId: 'p1',
+      }),
+    ).toBe(true);
+    expect(
+      canViewerMarkNextHandReady({
+        isLiveRoom: true,
+        connectionStatus: 'connected',
+        roomId: 'r',
+        readyState: {
+          ...readyState,
+          eligiblePlayers: [{ ...readyState.eligiblePlayers[0]!, isReady: true }],
+        },
+        viewerPlayerId: 'p1',
+      }),
     ).toBe(false);
   });
 

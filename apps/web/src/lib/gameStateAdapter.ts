@@ -1,4 +1,5 @@
 import type {
+  NextHandReadyStatePayload,
   PlayerGameState,
   RoomStatePayload,
   WireSeatView,
@@ -212,6 +213,56 @@ export function canViewerStartHand(opts: {
   }
 
   return !opts.hasActiveHand;
+}
+
+export function isNextHandReadyPhase(
+  readyState: NextHandReadyStatePayload | null | undefined,
+): boolean {
+  return readyState != null && readyState.requiredCount > 0;
+}
+
+export function viewerNextHandReadyEntry(
+  readyState: NextHandReadyStatePayload | null | undefined,
+  playerId: string | null | undefined,
+) {
+  if (readyState == null || playerId == null) {
+    return null;
+  }
+  return (
+    readyState.eligiblePlayers.find((p) => p.playerId === playerId) ?? null
+  );
+}
+
+/** Eligible viewer can mark ready during the post-hand ready phase. */
+export function canViewerMarkNextHandReady(opts: {
+  readonly isLiveRoom: boolean;
+  readonly connectionStatus: string;
+  readonly roomId: string | null;
+  readonly readyState: NextHandReadyStatePayload | null;
+  readonly viewerPlayerId: string | null;
+}): boolean {
+  if (
+    !opts.isLiveRoom ||
+    opts.connectionStatus !== 'connected' ||
+    opts.roomId == null ||
+    !isNextHandReadyPhase(opts.readyState) ||
+    opts.viewerPlayerId == null
+  ) {
+    return false;
+  }
+  const entry = viewerNextHandReadyEntry(opts.readyState, opts.viewerPlayerId);
+  return entry != null && !entry.isReady;
+}
+
+export function isViewerWaitingOnNextHandReady(opts: {
+  readonly readyState: NextHandReadyStatePayload | null;
+  readonly viewerPlayerId: string | null;
+}): boolean {
+  const entry = viewerNextHandReadyEntry(
+    opts.readyState,
+    opts.viewerPlayerId,
+  );
+  return entry != null && entry.isReady;
 }
 
 function preHandMockGameState(preset: SeatCount): MockGameState {

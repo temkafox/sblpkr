@@ -141,6 +141,24 @@ export const RebuyPayloadSchema = z.object({
   roomId: z.string().trim().min(1).max(128),
 });
 
+export const SetNextHandReadyPayloadSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
+});
+
+export const NextHandReadyPlayerSchema = z.object({
+  playerId: z.string().min(1),
+  nickname: z.string().min(1),
+  seatIndex: z.number().int().nonnegative(),
+  isReady: z.boolean(),
+});
+
+export const NextHandReadyStatePayloadSchema = z.object({
+  roomId: z.string().trim().min(1).max(128),
+  eligiblePlayers: z.array(NextHandReadyPlayerSchema),
+  readyCount: z.number().int().nonnegative(),
+  requiredCount: z.number().int().nonnegative(),
+});
+
 export const RebuyConfirmedPayloadSchema = z.object({
   roomId: z.string().trim().min(1).max(128),
   seatIndex: z.number().int().nonnegative(),
@@ -158,3 +176,8 @@ export type StartHandPayload = z.infer<typeof StartHandPayloadSchema>;
 export type RequestGameStatePayload = z.infer<typeof RequestGameStatePayloadSchema>;
 export type RebuyPayload = z.infer<typeof RebuyPayloadSchema>;
 export type RebuyConfirmedPayload = z.infer<typeof RebuyConfirmedPayloadSchema>;
+export type SetNextHandReadyPayload = z.infer<typeof SetNextHandReadyPayloadSchema>;
+export type NextHandReadyPlayer = z.infer<typeof NextHandReadyPlayerSchema>;
+export type NextHandReadyStatePayload = z.infer<
+  typeof NextHandReadyStatePayloadSchema
+>;

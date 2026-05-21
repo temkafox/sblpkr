@@ -13,12 +13,15 @@ import { RightSidebar } from '../../components/sidebar/RightSidebar';
 import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
+  canViewerMarkNextHandReady,
   canViewerRebuy,
   canViewerStartHand,
   countEligibleForNextHand,
   createWaitingLiveTableView,
+  isNextHandReadyPhase,
   isViewerDealtIntoHand,
   isViewerSeatedInRoom,
+  isViewerWaitingOnNextHandReady,
   resolveViewerSeatFromRoom,
   resolveViewerServerSeatIndex,
   isActiveHand,
@@ -35,6 +38,7 @@ import {
   requestHandHistory,
   sendChatMessage,
   sendPlayerAction,
+  setNextHandReady,
   startHand,
 } from '../../net/socket';
 import { useChatStore } from '../../state/chatStore';
@@ -48,6 +52,7 @@ export function TablePage() {
   const connectionStatus = useSessionStore((s) => s.connectionStatus);
   const gameState = useGameStore((s) => s.gameState);
   const handResult = useGameStore((s) => s.handResult);
+  const nextHandReadyState = useGameStore((s) => s.nextHandReadyState);
   const handHistory = useGameStore((s) => s.handHistory);
   const isGameLoading = useGameStore((s) => s.isGameLoading);
   const isSubmittingAction = useGameStore((s) => s.isSubmittingAction);
@@ -161,6 +166,7 @@ export function TablePage() {
   const handActive = tableView.phase === 'hand';
   const viewerStack = viewerSeatStack(gameState, viewerSeatIndex);
   const viewerSeatedInRoom = isViewerSeatedInRoom(roomState, nickname);
+  const nextHandReadyPhase = isNextHandReadyPhase(nextHandReadyState);
   const startHandBase = {
     isLiveRoom,
     connectionStatus,
@@ -172,13 +178,24 @@ export function TablePage() {
     viewerStack,
     viewerSeatedInRoom,
   };
-  const canStartHand = canViewerStartHand(startHandBase);
-  const canStartNextHand =
-    showHandResult &&
-    canViewerStartHand({
-      ...startHandBase,
-      afterHandResult: true,
-    });
+  const canStartHand =
+    !nextHandReadyPhase && canViewerStartHand(startHandBase);
+  const viewerPlayerId =
+    roomState?.players.find(
+      (p) =>
+        p.nickname?.trim().toLowerCase() === nickname?.trim().toLowerCase(),
+    )?.playerId ?? null;
+  const canMarkNextHandReady = canViewerMarkNextHandReady({
+    isLiveRoom,
+    connectionStatus,
+    roomId: roomId ?? null,
+    readyState: nextHandReadyState,
+    viewerPlayerId,
+  });
+  const viewerWaitingNextHandReady = isViewerWaitingOnNextHandReady({
+    readyState: nextHandReadyState,
+    viewerPlayerId,
+  });
   const canRebuy = canViewerRebuy({
     isLiveRoom,
     connectionStatus,
@@ -206,10 +223,10 @@ export function TablePage() {
     startHand(roomId);
   }, [roomId, canStartHand]);
 
-  const handleStartNextHand = useCallback(() => {
-    if (!roomId || !canStartNextHand) return;
-    startHand(roomId);
-  }, [roomId, canStartNextHand]);
+  const handleMarkNextHandReady = useCallback(() => {
+    if (!roomId || !canMarkNextHandReady) return;
+    setNextHandReady(roomId);
+  }, [roomId, canMarkNextHandReady]);
 
   const handleRebuy = useCallback(() => {
     if (!roomId || !canRebuy) return;
@@ -261,11 +278,15 @@ export function TablePage() {
           ? 'Loading game state…'
           : gameError && !hasLiveFeed
             ? gameError
-            : waitingForChips
-              ? 'Not enough players with chips — waiting for rebuy'
-              : waitingForPlayers
-                ? 'Waiting for another player (need at least 2)'
-                : null;
+            : nextHandReadyPhase && !canMarkNextHandReady && !canRebuy
+              ? viewerWaitingNextHandReady
+                ? 'Ready — waiting for other players'
+                : 'Waiting for next hand ready check'
+              : waitingForChips
+                ? 'Not enough players with chips — waiting for rebuy'
+                : waitingForPlayers
+                  ? 'Waiting for another player (need at least 2)'
+                  : null;
 
   const actionErrorLabel =
     handInProgress && gameError != null && gameError.length > 0
@@ -327,14 +348,25 @@ export function TablePage() {
           </button>
         </div>
       ) : null}
-      {canStartNextHand ? (
+      {canMarkNextHandReady ? (
         <div className="table-page__next-hand">
           <button
             type="button"
             className="table-page__start-hand table-page__start-hand--next"
-            onClick={handleStartNextHand}
+            onClick={handleMarkNextHandReady}
           >
-            Start Next Hand
+            Ready for next hand
+          </button>
+        </div>
+      ) : null}
+      {viewerWaitingNextHandReady ? (
+        <div className="table-page__next-hand">
+          <button
+            type="button"
+            className="table-page__start-hand table-page__start-hand--next"
+            disabled
+          >
+            Ready — waiting
           </button>
         </div>
       ) : null}
@@ -383,6 +415,7 @@ export function TablePage() {
         chatDisabled={chatDisabled}
         chatError={chatError}
         onSendChat={handleSendChat}
+        nextHandReady={nextHandReadyPhase ? nextHandReadyState : null}
         gameInfo={tableView.gameInfo}
       />
     </div>

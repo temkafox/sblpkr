@@ -204,16 +204,53 @@ export function syncTableToRoom(
   return synced;
 }
 
+export type EligibleNextHandPlayer = {
+  readonly playerId: string;
+  readonly seatIndex: SeatIndex;
+};
+
 /** Players with chips > 0 who are seated and not sitting out. */
 export function countEligiblePlayers(state: CoreGameState): number {
-  let count = 0;
-  for (const seat of state.table.seats) {
-    const p = getPlayerAtSeat(state, seat.seatIndex);
-    if (p != null && p.chips > 0 && !p.isSittingOut) {
-      count += 1;
+  return listEligiblePlayersForNextHand(state, null).length;
+}
+
+/**
+ * Eligible for the next hand: connected roster members with chips who are not sitting out.
+ * When `room` is omitted, only table eligibility is applied (legacy count-only callers).
+ */
+export function listEligiblePlayersForNextHand(
+  state: CoreGameState,
+  room: MutableInternalRoom | null,
+): EligibleNextHandPlayer[] {
+  const eligible: EligibleNextHandPlayer[] = [];
+
+  if (room == null) {
+    for (const seat of state.table.seats) {
+      const p = getPlayerAtSeat(state, seat.seatIndex);
+      if (p != null && p.chips > 0 && !p.isSittingOut) {
+        eligible.push({ playerId: p.playerId, seatIndex: seat.seatIndex });
+      }
+    }
+    return eligible.sort((a, b) => a.seatIndex - b.seatIndex);
+  }
+
+  for (const member of room.players) {
+    if (member.connectionStatus !== 'connected') {
+      continue;
+    }
+    if (member.seatIndex == null) {
+      continue;
+    }
+    const p = getPlayerAtSeat(state, member.seatIndex);
+    if (p == null || p.playerId !== member.playerId) {
+      continue;
+    }
+    if (p.chips > 0 && !p.isSittingOut) {
+      eligible.push({ playerId: p.playerId, seatIndex: member.seatIndex });
     }
   }
-  return count;
+
+  return eligible.sort((a, b) => a.seatIndex - b.seatIndex);
 }
 
 /**

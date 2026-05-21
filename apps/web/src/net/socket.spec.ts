@@ -5,6 +5,7 @@ import {
   CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_SEND_CHAT_MESSAGE,
+  CLIENT_SET_NEXT_HAND_READY,
   CLIENT_START_HAND,
   SERVER_CHAT_MESSAGES,
   SERVER_ERROR,
@@ -36,6 +37,7 @@ import {
   resetSocketClientForTests,
   sendChatMessage,
   sendPlayerAction,
+  setNextHandReady,
   startHand,
 } from './socket';
 
@@ -564,6 +566,19 @@ describe('socket client', () => {
     });
     expect(useGameStore.getState().isGameLoading).toBe(true);
     expect(useGameStore.getState().gameState?.seats[0]?.stack).toBe(0);
+  });
+
+  it('setNextHandReady emits CLIENT_SET_NEXT_HAND_READY', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    setNextHandReady(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_SET_NEXT_HAND_READY, {
+      roomId: roomState.roomId,
+    });
   });
 
   it('startHand emits CLIENT_START_HAND', async () => {

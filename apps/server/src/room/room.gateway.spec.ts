@@ -16,6 +16,7 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { ChatService } from '../chat/chat.service';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { HandHistoryService } from '../game/hand-history.service';
+import { NextHandReadyService } from '../game/next-hand-ready.service';
 import { GameService } from '../game/game.service';
 import { TableService } from '../table/table.service';
 import { RoomGateway } from './room.gateway';
@@ -50,8 +51,8 @@ function attachGatewayHandlers(io: Server, gateway: RoomGateway): void {
     socket.on(CLIENT_REGISTER_NICKNAME, (payload: unknown) => {
       gateway.handleRegisterNickname(socket, payload);
     });
-    socket.on(CLIENT_JOIN_ROOM, (payload: unknown) => {
-      void gateway.handleJoinRoom(socket, payload);
+    socket.on(CLIENT_JOIN_ROOM, async (payload: unknown) => {
+      await gateway.handleJoinRoom(socket, payload);
     });
     socket.on(CLIENT_LEAVE_ROOM, (payload: unknown) => {
       void gateway.handleLeaveRoom(socket, payload);
@@ -85,15 +86,18 @@ describe('RoomGateway (Socket.IO)', () => {
     const tableService = new TableService();
     const gameService = GameService.forTest({ roomService, tableService });
     const handHistory = new HandHistoryService();
+    const nextHandReady = new NextHandReadyService(roomService, tableService);
     const gameBroadcast = new GameBroadcastService(
       roomService,
       tableService,
       handHistory,
+      nextHandReady,
     );
     gateway = new RoomGateway(
       roomService,
       gameService,
       gameBroadcast,
+      nextHandReady,
       new ChatService(),
     );
     gateway.onModuleInit();

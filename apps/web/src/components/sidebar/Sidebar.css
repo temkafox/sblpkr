@@ -27,10 +27,61 @@
   flex-direction: column;
 }
 
+.np-sidebar .np-panel.np-next-hand {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  max-height: 160px;
+}
+
 .np-sidebar .np-panel.np-game-info {
   flex: 0 0 85px;
   display: flex;
   flex-direction: column;
+}
+
+.np-nh-count {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+}
+
+.np-nh-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.np-nh-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-mid);
+}
+
+.np-nh-row--ready .np-nh-name {
+  color: var(--text-hi);
+}
+
+.np-nh-row--waiting .np-nh-name {
+  color: var(--text-mid);
+}
+
+.np-nh-icon {
+  flex: 0 0 18px;
+  text-align: center;
+  line-height: 1;
+}
+
+.np-nh-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .np-panel {

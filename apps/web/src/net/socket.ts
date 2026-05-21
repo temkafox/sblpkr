@@ -8,12 +8,14 @@ import {
   CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
   CLIENT_SEND_CHAT_MESSAGE,
+  CLIENT_SET_NEXT_HAND_READY,
   CLIENT_START_HAND,
   SERVER_CHAT_MESSAGES,
   SERVER_ERROR,
   SERVER_GAME_STATE,
   SERVER_HAND_HISTORY,
   SERVER_HAND_RESULT,
+  SERVER_NEXT_HAND_READY_STATE,
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
 import type {
@@ -25,7 +27,11 @@ import type {
   RoomStatePayload,
   ServerErrorPayload,
 } from '@neonpoker/shared';
-import { ChatMessagesPayloadSchema, HandHistoryPayloadSchema } from '@neonpoker/shared';
+import {
+  ChatMessagesPayloadSchema,
+  HandHistoryPayloadSchema,
+  NextHandReadyStatePayloadSchema,
+} from '@neonpoker/shared';
 import { io, type Socket } from 'socket.io-client';
 
 import {
@@ -128,6 +134,20 @@ function attachGlobalListeners(client: Socket): void {
       return;
     }
     useGameStore.getState().setHandHistory(parsed.data);
+  });
+
+  client.on(SERVER_NEXT_HAND_READY_STATE, (payload: unknown) => {
+    const parsed = NextHandReadyStatePayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      return;
+    }
+    const activeRoomId =
+      useRoomStore.getState().roomState?.roomId ??
+      useSessionStore.getState().roomId;
+    if (activeRoomId != null && parsed.data.roomId !== activeRoomId) {
+      return;
+    }
+    useGameStore.getState().setNextHandReadyState(parsed.data);
   });
 
   client.on(SERVER_HAND_RESULT, (payload: HandResultPayload) => {
@@ -314,6 +334,10 @@ export function onChatMessages(
 
 export function startHand(roomId: string): void {
   socket?.emit(CLIENT_START_HAND, { roomId });
+}
+
+export function setNextHandReady(roomId: string): void {
+  socket?.emit(CLIENT_SET_NEXT_HAND_READY, { roomId });
 }
 
 export function rebuy(roomId: string): void {

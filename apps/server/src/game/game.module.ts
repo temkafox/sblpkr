@@ -4,11 +4,22 @@ import { RoomModule } from '../room/room.module';
 import { TableModule } from '../table/table.module';
 import { GameBroadcastService } from './game-broadcast';
 import { HandHistoryService } from './hand-history.service';
+import { NextHandReadyService } from './next-hand-ready.service';
 import { GameService } from './game.service';
 
 @Module({
   imports: [forwardRef(() => RoomModule), TableModule],
-  providers: [HandHistoryService, GameService, GameBroadcastService],
-  exports: [HandHistoryService, GameService, GameBroadcastService],
+  providers: [
+    HandHistoryService,
+    GameService,
+    NextHandReadyService,
+    GameBroadcastService,
+  ],
+  exports: [
+    HandHistoryService,
+    GameService,
+    NextHandReadyService,
+    GameBroadcastService,
+  ],
 })
 export class GameModule {}
