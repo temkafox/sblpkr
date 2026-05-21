@@ -17,6 +17,7 @@ import {
   SERVER_HAND_RESULT,
   SERVER_NEXT_HAND_READY_STATE,
   SERVER_ROOM_STATE,
+  SOCKET_IO_PATH,
 } from '@neonpoker/shared';
 import type {
   ChatMessage,
@@ -194,6 +195,7 @@ export async function connectSocket(): Promise<Socket> {
 
   return new Promise((resolve, reject) => {
     const client = io(getApiBaseUrl(), {
+      path: SOCKET_IO_PATH,
       transports: ['polling', 'websocket'],
       autoConnect: true,
     });

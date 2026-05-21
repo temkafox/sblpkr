@@ -15,6 +15,7 @@ export * from './types/room';
 export * from './types/game-errors';
 
 export * from './events/socket-events';
+export * from './net/socket-io-path';
 
 export * from './dto/room.dto';
 export * from './dto/game.dto';

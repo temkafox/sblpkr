@@ -45,5 +45,9 @@ export function formatJoinError(err: unknown): string {
     return 'Join timed out. Check your connection and try again.';
   }
 
+  if (err instanceof Error && err.message.length > 0) {
+    return err.message;
+  }
+
   return 'Something went wrong. Please try again.';
 }

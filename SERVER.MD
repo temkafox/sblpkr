@@ -32,7 +32,8 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    location /socket.io/ {
+    # Custom path /np-io (default /socket.io/ is blocked by many ad blockers)
+    location /np-io/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -60,12 +61,12 @@ server {
 curl -s http://127.0.0.1:3000/health
 
 # Through nginx — must NOT return index.html HTML
-curl -s "http://YOUR_VPS_IP/socket.io/?EIO=4&transport=polling" | head -c 80
+curl -s "http://YOUR_VPS_IP/np-io/?EIO=4&transport=polling" | head -c 80
 curl -s http://YOUR_VPS_IP/health
 
 # Built frontend points at VPS, not localhost
-grep -r "localhost:3000" apps/web/dist/ && echo "BAD: rebuild with VITE_API_URL" || echo "OK: no localhost"
 grep -r "YOUR_VPS_IP" apps/web/dist/assets/*.js | head -1
+# `localhost:3000` in bundle is OK — dev fallback string, not used when VITE_API_URL is set
 ```
 
 ## Browser (Create Room → Join)
@@ -74,7 +75,7 @@ Network filter **All** (not only Fetch):
 
 1. `POST http://YOUR_VPS_IP/rooms` → 201
 2. `GET http://YOUR_VPS_IP/rooms/<uuid>` → 200
-3. `GET http://YOUR_VPS_IP/socket.io/?EIO=4&transport=polling` → 200 (then WS upgrade)
+3. `GET http://YOUR_VPS_IP/np-io/?EIO=4&transport=polling` → 200 (then WS upgrade)
 
 If (1) exists but (2) missing → session stops before socket; check response body / console.
 

@@ -32,6 +32,7 @@ import {
   SERVER_GAME_STATE,
   SERVER_NEXT_HAND_READY_STATE,
   SERVER_ROOM_STATE,
+  SOCKET_IO_PATH,
 } from '@neonpoker/shared';
 import type { SocketErrorCode } from '@neonpoker/shared';
 import type { Server, Socket } from 'socket.io';
@@ -50,6 +51,7 @@ import { RoomService } from './room.service';
 
 @Injectable()
 @WebSocketGateway({
+  path: SOCKET_IO_PATH,
   cors: resolveSocketCors(),
 })
 export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
