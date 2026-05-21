@@ -29,8 +29,10 @@ export interface HandHistoryStreet {
 }
 
 export interface ChatMessageMock {
+  id?: string;
   who: string;
-  cls: HandHistoryRow['cls'];
+  /** Chat nickname tone id (see `CHAT_PLAYER_TONES` in chatPlayerColor). */
+  cls: string;
   msg: string;
 }
 

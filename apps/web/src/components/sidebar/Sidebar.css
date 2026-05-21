@@ -165,6 +165,18 @@
   font-size: 13px;
 }
 
+.np-chat-empty {
+  margin: 0;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+
+.np-chat-error {
+  margin: 4px 0 0;
+  color: var(--neon-pink, #ff6bcb);
+  font-size: 11px;
+}
+
 .np-chat-row {
   display: flex;
   gap: 6px;
@@ -196,7 +208,8 @@
   padding: 4px 4px 4px 14px;
 }
 
-.np-chat-input input {
+.np-chat-input input,
+.np-chat-input textarea {
   flex: 1;
   background: transparent;
   border: 0;
@@ -205,10 +218,17 @@
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 6px 0;
+  resize: none;
+  line-height: 1.35;
 }
 
-.np-chat-input input::placeholder {
+.np-chat-input input::placeholder,
+.np-chat-input textarea::placeholder {
   color: var(--text-mute);
+}
+
+.np-chat-input textarea:disabled {
+  opacity: 0.55;
 }
 
 .np-chat-input .np-chat-send {
@@ -223,6 +243,11 @@
   cursor: default;
   box-shadow: var(--glow-cyan);
   opacity: 0.65;
+}
+
+.np-chat-input .np-chat-send:not(:disabled) {
+  cursor: pointer;
+  opacity: 1;
 }
 
 .np-gi-body {
@@ -267,4 +292,38 @@
 }
 .np-namecolor-n-h {
   color: #fff;
+}
+
+/* Table chat — dedicated tones (higher contrast, distinct per player) */
+.np-chat-tone-cyan {
+  color: #5cefff;
+  text-shadow: 0 0 8px rgba(34, 211, 255, 0.45);
+}
+.np-chat-tone-magenta {
+  color: #ff7bf0;
+  text-shadow: 0 0 8px rgba(255, 61, 240, 0.45);
+}
+.np-chat-tone-pink {
+  color: #ff6b9d;
+  text-shadow: 0 0 8px rgba(255, 46, 107, 0.45);
+}
+.np-chat-tone-violet {
+  color: #c4a8ff;
+  text-shadow: 0 0 8px rgba(139, 92, 255, 0.45);
+}
+.np-chat-tone-green {
+  color: #6dffb8;
+  text-shadow: 0 0 8px rgba(43, 255, 155, 0.4);
+}
+.np-chat-tone-amber {
+  color: #ffd36a;
+  text-shadow: 0 0 8px rgba(255, 180, 61, 0.45);
+}
+.np-chat-tone-blue {
+  color: #7eb8ff;
+  text-shadow: 0 0 8px rgba(42, 111, 255, 0.45);
+}
+.np-chat-tone-orange {
+  color: #ffb07a;
+  text-shadow: 0 0 8px rgba(255, 140, 60, 0.45);
 }

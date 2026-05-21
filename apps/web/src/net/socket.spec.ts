@@ -2,8 +2,11 @@ import {
   CLIENT_PLAYER_ACTION,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
+  CLIENT_SEND_CHAT_MESSAGE,
   CLIENT_START_HAND,
+  SERVER_CHAT_MESSAGES,
   SERVER_ERROR,
   SERVER_GAME_STATE,
   SERVER_HAND_HISTORY,
@@ -19,6 +22,7 @@ import type {
 } from '@neonpoker/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useChatStore } from '../state/chatStore';
 import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -26,9 +30,11 @@ import {
   connectSocket,
   joinRoom,
   rebuy,
+  requestChatMessages,
   requestGameState,
   requestHandHistory,
   resetSocketClientForTests,
+  sendChatMessage,
   sendPlayerAction,
   startHand,
 } from './socket';
@@ -394,6 +400,109 @@ describe('socket client', () => {
     fire(SERVER_HAND_RESULT, { ...handResult, handId: 'hand-stale' });
 
     expect(useGameStore.getState().handResult).toBeNull();
+  });
+
+  it('sendChatMessage emits CLIENT_SEND_CHAT_MESSAGE with trimmed text', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    sendChatMessage(roomState.roomId, '  hello  ');
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_SEND_CHAT_MESSAGE, {
+      roomId: roomState.roomId,
+      text: 'hello',
+    });
+  });
+
+  it('sendChatMessage does not emit for empty text', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    sendChatMessage(roomState.roomId, '   ');
+    expect(mockEmit).not.toHaveBeenCalledWith(
+      CLIENT_SEND_CHAT_MESSAGE,
+      expect.anything(),
+    );
+  });
+
+  it('requestChatMessages emits CLIENT_REQUEST_CHAT_MESSAGES', async () => {
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    requestChatMessages(roomState.roomId);
+
+    expect(mockEmit).toHaveBeenCalledWith(CLIENT_REQUEST_CHAT_MESSAGES, {
+      roomId: roomState.roomId,
+    });
+  });
+
+  it('SERVER_CHAT_MESSAGES ignores snapshots for a different room', async () => {
+    useRoomStore.getState().setRoomState(roomState);
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    fire(SERVER_CHAT_MESSAGES, {
+      roomId: 'other-room-id',
+      messages: [
+        {
+          id: 'm1',
+          roomId: 'other-room-id',
+          playerId: 'p1',
+          nickname: 'A',
+          text: 'wrong room',
+          sequence: 1,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(useChatStore.getState().chatMessages).toEqual([]);
+  });
+
+  it('SERVER_CHAT_MESSAGES replaces chat store snapshot', async () => {
+    useRoomStore.getState().setRoomState(roomState);
+    const connectPromise = connectSocket();
+    mockSocket.connected = true;
+    fire('connect');
+    await connectPromise;
+
+    const first = {
+      id: 'm1',
+      roomId: roomState.roomId,
+      playerId: 'p1',
+      nickname: 'A',
+      text: 'one',
+      sequence: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    fire(SERVER_CHAT_MESSAGES, { roomId: roomState.roomId, messages: [first] });
+    fire(SERVER_CHAT_MESSAGES, {
+      roomId: roomState.roomId,
+      messages: [
+        first,
+        {
+          id: 'm2',
+          roomId: roomState.roomId,
+          playerId: 'p2',
+          nickname: 'B',
+          text: 'two',
+          sequence: 2,
+          createdAt: '2026-01-01T00:00:01.000Z',
+        },
+      ],
+    });
+
+    const messages = useChatStore.getState().chatMessages;
+    expect(messages).toHaveLength(2);
+    expect(messages.map((m) => m.id)).toEqual(['m1', 'm2']);
   });
 
   it('requestHandHistory emits CLIENT_REQUEST_HAND_HISTORY', async () => {

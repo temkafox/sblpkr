@@ -13,6 +13,7 @@ import {
 import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
+import { ChatService } from '../chat/chat.service';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { HandHistoryService } from '../game/hand-history.service';
 import { GameService } from '../game/game.service';
@@ -89,7 +90,12 @@ describe('RoomGateway (Socket.IO)', () => {
       tableService,
       handHistory,
     );
-    gateway = new RoomGateway(roomService, gameService, gameBroadcast);
+    gateway = new RoomGateway(
+      roomService,
+      gameService,
+      gameBroadcast,
+      new ChatService(),
+    );
     gateway.onModuleInit();
     httpServer = createServer();
     io = new Server(httpServer, { cors: { origin: true } });

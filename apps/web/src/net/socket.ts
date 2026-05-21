@@ -5,8 +5,11 @@ import {
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
+  CLIENT_SEND_CHAT_MESSAGE,
   CLIENT_START_HAND,
+  SERVER_CHAT_MESSAGES,
   SERVER_ERROR,
   SERVER_GAME_STATE,
   SERVER_HAND_HISTORY,
@@ -14,6 +17,7 @@ import {
   SERVER_ROOM_STATE,
 } from '@neonpoker/shared';
 import type {
+  ChatMessage,
   HandHistoryPayload,
   HandResultPayload,
   PlayerActionIntent,
@@ -21,13 +25,14 @@ import type {
   RoomStatePayload,
   ServerErrorPayload,
 } from '@neonpoker/shared';
-import { HandHistoryPayloadSchema } from '@neonpoker/shared';
+import { ChatMessagesPayloadSchema, HandHistoryPayloadSchema } from '@neonpoker/shared';
 import { io, type Socket } from 'socket.io-client';
 
 import {
   shouldAcceptGameStatePayload,
   shouldClearGameStateForRoom,
 } from '../lib/gameStateRoster';
+import { useChatStore } from '../state/chatStore';
 import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import {
@@ -43,6 +48,7 @@ let listenersAttached = false;
 
 const gameStateListeners = new Set<(state: PlayerGameState) => void>();
 const handResultListeners = new Set<(result: HandResultPayload) => void>();
+const chatMessagesListeners = new Set<(messages: ChatMessage[]) => void>();
 
 export class SocketRoomError extends Error {
   readonly code: string;
@@ -66,7 +72,11 @@ function attachGlobalListeners(client: Socket): void {
   listenersAttached = true;
 
   client.on(SERVER_ROOM_STATE, (payload: RoomStatePayload) => {
+    const prevRoomId = useRoomStore.getState().roomState?.roomId;
     useRoomStore.getState().setRoomState(payload);
+    if (prevRoomId != null && prevRoomId !== payload.roomId) {
+      useChatStore.getState().clearChatMessages();
+    }
     if (
       shouldClearGameStateForRoom(
         payload,
@@ -79,6 +89,23 @@ function attachGlobalListeners(client: Socket): void {
     useGameStore.getState().setGameError(null);
     useGameStore.getState().setGameLoading(false);
     setConnectionStatus('connected');
+  });
+
+  client.on(SERVER_CHAT_MESSAGES, (payload: unknown) => {
+    const parsed = ChatMessagesPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      return;
+    }
+    const activeRoomId =
+      useRoomStore.getState().roomState?.roomId ??
+      useSessionStore.getState().roomId;
+    if (activeRoomId != null && parsed.data.roomId !== activeRoomId) {
+      return;
+    }
+    useChatStore.getState().setChatMessages(parsed.data.messages);
+    for (const listener of chatMessagesListeners) {
+      listener(parsed.data.messages);
+    }
   });
 
   client.on(SERVER_GAME_STATE, (payload: PlayerGameState) => {
@@ -122,6 +149,7 @@ function attachGlobalListeners(client: Socket): void {
   client.on(SERVER_ERROR, (payload: ServerErrorPayload) => {
     useRoomStore.getState().setError(payload);
     useGameStore.getState().setGameError(payload.message ?? payload.code);
+    useChatStore.getState().setChatError(payload.message ?? payload.code);
     setConnectionStatus('error');
   });
 
@@ -182,8 +210,10 @@ export function disconnectSocket(): void {
   listenersAttached = false;
   gameStateListeners.clear();
   handResultListeners.clear();
+  chatMessagesListeners.clear();
   useGameStore.getState().clearHandResult();
   useGameStore.getState().clearHandHistory();
+  useChatStore.getState().clearChatMessages();
   setConnectionStatus('idle');
 }
 
@@ -202,6 +232,7 @@ export function leaveRoom(roomId?: string): void {
   }
   useGameStore.getState().clearHandResult();
   useGameStore.getState().clearHandHistory();
+  useChatStore.getState().clearChatMessages();
 }
 
 export function joinRoom(
@@ -258,6 +289,27 @@ export function requestGameState(roomId: string): void {
 
 export function requestHandHistory(roomId: string): void {
   socket?.emit(CLIENT_REQUEST_HAND_HISTORY, { roomId });
+}
+
+export function sendChatMessage(roomId: string, text: string): void {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+  socket?.emit(CLIENT_SEND_CHAT_MESSAGE, { roomId, text: trimmed });
+}
+
+export function requestChatMessages(roomId: string): void {
+  socket?.emit(CLIENT_REQUEST_CHAT_MESSAGES, { roomId });
+}
+
+export function onChatMessages(
+  callback: (messages: ChatMessage[]) => void,
+): () => void {
+  chatMessagesListeners.add(callback);
+  return () => {
+    chatMessagesListeners.delete(callback);
+  };
 }
 
 export function startHand(roomId: string): void {

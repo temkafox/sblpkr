@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerGameState, RoomStatePayload } from '@neonpoker/shared';
@@ -6,13 +6,17 @@ import type { PlayerGameState, RoomStatePayload } from '@neonpoker/shared';
 import { TABLE_PAGE_MOCK } from '../../mocks/tableMock';
 import * as socket from '../../net/socket';
 import { TablePage } from './TablePage';
+import { useChatStore } from '../../state/chatStore';
 import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
+import { chatRowsFromMessages } from '../../lib/chatAdapter';
 
 vi.mock('../../net/socket', () => ({
   requestGameState: vi.fn(),
   requestHandHistory: vi.fn(),
+  requestChatMessages: vi.fn(),
+  sendChatMessage: vi.fn(),
   startHand: vi.fn(),
   rebuy: vi.fn(),
   sendPlayerAction: vi.fn(),
@@ -134,6 +138,7 @@ describe('TablePage live room', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useGameStore.getState().clearGameState();
+    useChatStore.getState().clearChatMessages();
     useRoomStore.setState({ roomState: null, lastError: null });
     useSessionStore.setState({
       nickname: 'ljhh',
@@ -146,6 +151,57 @@ describe('TablePage live room', () => {
     renderTable();
     expect(socket.requestGameState).toHaveBeenCalledWith(roomId);
     expect(socket.requestHandHistory).toHaveBeenCalledWith(roomId);
+  });
+
+  it('requests chat snapshot when socket is connected and room is joined', () => {
+    useRoomStore.getState().setRoomState(soloRoom);
+    renderTable();
+    expect(socket.requestChatMessages).toHaveBeenCalledWith(roomId);
+  });
+
+  it('renders hydrated chat after snapshot without sending a message', async () => {
+    useRoomStore.getState().setRoomState(duoRoom);
+    renderTable();
+    useChatStore.getState().setChatMessages([
+      {
+        id: 'm1',
+        roomId,
+        playerId: 'a',
+        nickname: 'ljhh',
+        text: 'old line',
+        sequence: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    await waitFor(() => {
+      expect(screen.getByText('old line')).toBeInTheDocument();
+      expect(screen.getByText('ljhh:')).toBeInTheDocument();
+    });
+  });
+
+  it('uses stable chat color for repeated messages from one player', () => {
+    const rows = chatRowsFromMessages([
+      {
+        id: 'm1',
+        roomId,
+        playerId: 'a',
+        nickname: 'd32f',
+        text: 'one',
+        sequence: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'm2',
+        roomId,
+        playerId: 'a',
+        nickname: 'd32f',
+        text: 'two',
+        sequence: 2,
+        createdAt: '2026-01-01T00:00:01.000Z',
+      },
+    ]);
+    expect(rows[0]!.cls).toBe(rows[1]!.cls);
+    expect(rows[0]!.cls).not.toMatch(/^n-/);
   });
 
   it('pre-hand with one player hides board, badges, and Start Hand', () => {

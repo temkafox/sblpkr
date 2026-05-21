@@ -17,7 +17,7 @@
   position: absolute;
   left: 50%;
   bottom: 100%;
-  margin-bottom: -28px;
+  margin-bottom: -20px;
   transform: translateX(-50%);
   display: flex;
   pointer-events: none;
@@ -460,6 +460,38 @@
   z-index: 18;
 }
 
+.seat.hero .np-hero-holes {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 14px;
+  top: auto;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 124px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.seat.hero .np-hero-holes .np-card-face {
+  transform: rotate(-6deg);
+  width: 84px;
+  height: 118px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 0 0 2px rgba(0, 0, 0, 0.5),
+    0 0 22px rgba(34, 211, 255, 0.6),
+    0 12px 24px rgba(0, 0, 0, 0.6);
+}
+
+.seat.hero .np-hero-holes .np-card-face:nth-child(2) {
+  transform: rotate(6deg);
+}
+
 .seat.hero .body {
   left: 36px;
   border-radius: 28px;
@@ -558,6 +590,7 @@
 .seat-badge.d {
   background: linear-gradient(145deg, #fff, #d0d0d8 60%, #6a6a78);
   color: #111;
+  z-index: 44;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.5) inset,
     0 0 14px rgba(255, 255, 255, 0.4);
@@ -573,7 +606,7 @@
   border-radius: var(--r-pill);
   padding: 3px 10px 3px 3px;
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-  z-index: 14;
+  z-index: 44;
 }
 
 .bet-chip img {

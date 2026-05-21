@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  ChatMessagePayloadSchema,
+  ChatMessagesPayloadSchema,
+  RequestChatMessagesPayloadSchema,
+  SendChatMessagePayloadSchema,
   ClientHelloSchema,
   CreateRoomRequestSchema,
   HandHistoryPayloadSchema,
@@ -171,15 +173,66 @@ describe('HandResultPayloadSchema', () => {
   });
 });
 
-describe('ChatMessagePayloadSchema', () => {
-  it('requires message body', () => {
+describe('SendChatMessagePayloadSchema', () => {
+  it('accepts trimmed text up to 200 chars', () => {
+    const parsed = SendChatMessagePayloadSchema.parse({
+      roomId: '11111111-1111-4111-8111-111111111111',
+      text: '  gl hf  ',
+    });
+    expect(parsed.text).toBe('gl hf');
+  });
+
+  it('rejects empty or whitespace-only text', () => {
     expect(() =>
-      ChatMessagePayloadSchema.parse({ message: 'gl hf' }),
-    ).not.toThrow();
-    expect(() => ChatMessagePayloadSchema.parse({ message: '' })).toThrow();
-    expect(() =>
-      ChatMessagePayloadSchema.parse({ message: '   ' }),
+      SendChatMessagePayloadSchema.parse({
+        roomId: '11111111-1111-4111-8111-111111111111',
+        text: '',
+      }),
     ).toThrow();
+    expect(() =>
+      SendChatMessagePayloadSchema.parse({
+        roomId: '11111111-1111-4111-8111-111111111111',
+        text: '   ',
+      }),
+    ).toThrow();
+  });
+
+  it('rejects text longer than 200 chars', () => {
+    expect(() =>
+      SendChatMessagePayloadSchema.parse({
+        roomId: '11111111-1111-4111-8111-111111111111',
+        text: 'x'.repeat(201),
+      }),
+    ).toThrow();
+  });
+});
+
+describe('RequestChatMessagesPayloadSchema', () => {
+  it('requires roomId', () => {
+    const parsed = RequestChatMessagesPayloadSchema.parse({
+      roomId: 'ABC123',
+    });
+    expect(parsed.roomId).toBe('ABC123');
+  });
+});
+
+describe('ChatMessagesPayloadSchema', () => {
+  it('parses chat snapshot', () => {
+    const parsed = ChatMessagesPayloadSchema.parse({
+      roomId: 'room-1',
+      messages: [
+        {
+          id: 'm1',
+          roomId: 'room-1',
+          playerId: 'p1',
+          nickname: 'Neo',
+          text: 'hi',
+          sequence: 1,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(parsed.messages).toHaveLength(1);
   });
 });
 

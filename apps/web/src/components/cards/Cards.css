@@ -103,7 +103,7 @@
   width: 88px;
   height: 124px;
   background-image: url('/assets/backcard.png');
-  background-size: cover;
+  background-size: contain;
   background-position: center;
   border-radius: 8px;
   box-shadow:
@@ -122,31 +122,4 @@
     0 6px 14px rgba(0, 0, 0, 0.7);
 }
 
-.np-hero-holes {
-  position: absolute;
-  left: 760px;
-  top: 568px;
-  width: 200px;
-  height: 130px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 10px;
-  z-index: 19;
-  pointer-events: none;
-}
-
-.np-hero-holes .np-card-face {
-  transform: rotate(-6deg) translateY(2px);
-  width: 84px;
-  height: 118px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
-    0 0 0 2px rgba(0, 0, 0, 0.5),
-    0 0 22px rgba(34, 211, 255, 0.6),
-    0 12px 24px rgba(0, 0, 0, 0.6);
-}
-
-.np-hero-holes .np-card-face:nth-child(2) {
-  transform: rotate(6deg) translateY(2px);
-}
+/* Hero holes are anchored on `.seat.hero` — see Seats.css */

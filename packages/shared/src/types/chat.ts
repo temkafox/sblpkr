@@ -1,7 +1,11 @@
-/** Sidebar chat row — mirrors Hand History name coloring via `cls`. */
+/** Wire-safe table chat message (server-fed snapshot rows). */
 
 export type ChatMessage = {
-  readonly who: string;
-  readonly cls: string;
-  readonly msg: string;
+  readonly id: string;
+  readonly roomId: string;
+  readonly playerId: string;
+  readonly nickname: string;
+  readonly text: string;
+  readonly sequence: number;
+  readonly createdAt: string;
 };

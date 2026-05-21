@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 
 import { betOffset, badgeOffset, type SeatPosition } from '../../lib/layout';
 import { chipFor } from '../../lib/chips';
-import type { MockGameState, PlayerMock, SeatStateMock } from '../../mocks/tableMock';
+import type { CardModel, MockGameState, PlayerMock, SeatStateMock } from '../../mocks/tableMock';
 import { BetChip } from './BetChip';
 import { HeroSeat } from './HeroSeat';
 import { PlayerSeat } from './PlayerSeat';
@@ -17,6 +17,7 @@ export interface SeatLayerProps {
   gameState: MockGameState;
   /** When false, hides blinds/button badges, bet chips, and opponent holes. */
   handActive?: boolean;
+  heroHoleCards?: [CardModel, CardModel] | null;
 }
 
 /** Blind/button badges — driven only by mock indices (no blind math in UI). */
@@ -34,6 +35,7 @@ export function SeatLayer({
   seatStatesBySeatIndex,
   gameState,
   handActive = true,
+  heroHoleCards = null,
 }: SeatLayerProps) {
   const showBadges = handActive;
   const showBets = handActive;
@@ -63,7 +65,12 @@ export function SeatLayer({
         return (
           <Fragment key={pos.id}>
             {pos.hero ? (
-              <HeroSeat player={player} state={st} position={pos} />
+              <HeroSeat
+                player={player}
+                state={st}
+                position={pos}
+                holeCards={heroHoleCards}
+              />
             ) : (
               <PlayerSeat
                 player={player}

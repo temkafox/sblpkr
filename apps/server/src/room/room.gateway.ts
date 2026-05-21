@@ -14,9 +14,14 @@ import {
   CLIENT_REGISTER_NICKNAME,
   CLIENT_REBUY,
   CLIENT_REQUEST_GAME_STATE,
+  CLIENT_REQUEST_CHAT_MESSAGES,
   CLIENT_REQUEST_HAND_HISTORY,
+  CLIENT_SEND_CHAT_MESSAGE,
   CLIENT_START_HAND,
+  RequestChatMessagesPayloadSchema,
   RequestHandHistoryPayloadSchema,
+  SendChatMessagePayloadSchema,
+  SERVER_CHAT_MESSAGES,
   PlayerActionPayloadSchema,
   RebuyPayloadSchema,
   RequestGameStatePayloadSchema,
@@ -35,6 +40,7 @@ import {
   toIdlePlayerGameState,
   toPlayerGameState,
 } from '../game/game-state-view';
+import { ChatService, type ChatAuthor } from '../chat/chat.service';
 import { LOCAL_DEV_SOCKET_CORS } from '../cors.config';
 import { RoomService } from './room.service';
 
@@ -50,6 +56,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     private readonly roomService: RoomService,
     private readonly gameService: GameService,
     private readonly gameBroadcast: GameBroadcastService,
+    private readonly chatService: ChatService,
   ) {}
 
   onModuleInit(): void {
@@ -183,6 +190,79 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     this.gameBroadcast.emitHandHistoryToClient(client, roomId);
   }
 
+  @SubscribeMessage(CLIENT_SEND_CHAT_MESSAGE)
+  handleSendChatMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): void {
+    const parsed = SendChatMessagePayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      this.emitError(
+        client,
+        'INVALID_PAYLOAD',
+        parsed.error.issues[0]?.message ?? 'Invalid chat message payload',
+      );
+      return;
+    }
+
+    const roomId = this.resolveRoomId(parsed.data.roomId);
+    if (roomId == null) {
+      this.emitError(client, 'ROOM_NOT_FOUND', 'Room not found');
+      return;
+    }
+
+    if (!this.roomService.isSocketInRoom(client.id, roomId)) {
+      this.emitError(client, 'NOT_JOINED', 'Join the room before sending chat');
+      return;
+    }
+
+    const author = this.resolveChatAuthor(client.id, roomId);
+    if (author == null) {
+      this.emitError(client, 'NOT_JOINED', 'Join the room before sending chat');
+      return;
+    }
+
+    const snapshot = this.chatService.addMessage(
+      roomId,
+      author,
+      parsed.data.text,
+    );
+    this.server.to(roomId).emit(SERVER_CHAT_MESSAGES, snapshot);
+  }
+
+  @SubscribeMessage(CLIENT_REQUEST_CHAT_MESSAGES)
+  handleRequestChatMessages(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): void {
+    const parsed = RequestChatMessagesPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      this.emitError(
+        client,
+        'INVALID_PAYLOAD',
+        parsed.error.issues[0]?.message ?? 'Invalid chat request payload',
+      );
+      return;
+    }
+
+    const roomId = this.resolveRoomId(parsed.data.roomId);
+    if (roomId == null) {
+      this.emitError(client, 'ROOM_NOT_FOUND', 'Room not found');
+      return;
+    }
+
+    if (!this.roomService.isSocketInRoom(client.id, roomId)) {
+      this.emitError(
+        client,
+        'NOT_JOINED',
+        'Join the room before requesting chat',
+      );
+      return;
+    }
+
+    client.emit(SERVER_CHAT_MESSAGES, this.chatService.getMessages(roomId));
+  }
+
   @SubscribeMessage(CLIENT_START_HAND)
   handleStartHand(
     @ConnectedSocket() client: Socket,
@@ -300,6 +380,20 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
     }
+  }
+
+  private resolveChatAuthor(socketId: string, roomId: string): ChatAuthor | null {
+    const session = this.roomService.getSession(socketId);
+    if (session?.playerId == null || session.roomId !== roomId) {
+      return null;
+    }
+    const room = this.roomService.getRoom(roomId);
+    const member = room?.players.find((p) => p.playerId === session.playerId);
+    const nickname = member?.nickname ?? session.nickname;
+    if (nickname == null || nickname.length === 0) {
+      return null;
+    }
+    return { playerId: session.playerId, nickname };
   }
 
   private resolveRoomId(roomIdOrCode: string): string | null {

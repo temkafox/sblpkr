@@ -1,9 +1,10 @@
 import './Seats.css';
 
+import { HeroHoleCards } from '../cards/HeroHoleCards';
 import { Avatar } from './Avatar';
 import { formatChips } from '../../lib/formatChips';
 import type { SeatPosition } from '../../lib/layout';
-import type { PlayerMock, SeatStateMock } from '../../mocks/tableMock';
+import type { CardModel, PlayerMock, SeatStateMock } from '../../mocks/tableMock';
 
 function heroStateClass(status: SeatStateMock['status']) {
   switch (status) {
@@ -87,15 +88,22 @@ export interface HeroSeatProps {
   player: PlayerMock;
   state: SeatStateMock;
   position: SeatPosition;
+  holeCards?: [CardModel, CardModel] | null;
 }
 
-export function HeroSeat({ player, state: st, position: pos }: HeroSeatProps) {
+export function HeroSeat({
+  player,
+  state: st,
+  position: pos,
+  holeCards,
+}: HeroSeatProps) {
   const w = pos.w || 320;
   const h = pos.h || 110;
   const states = heroStateClass(st.status);
 
   return (
     <div className={`seat hero ${states}`} style={{ left: pos.x, top: pos.y, width: w, height: h }}>
+      {holeCards ? <HeroHoleCards cards={holeCards} /> : null}
       <div className="body">
         <div className="body-inner">
           <div className="name">{player.name}</div>

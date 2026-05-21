@@ -22,6 +22,7 @@ import {
 import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
+import { ChatService } from '../chat/chat.service';
 import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameBroadcastService } from './game-broadcast';
 import { HandHistoryService } from './hand-history.service';
@@ -113,7 +114,12 @@ describe('Game gateway (Phase 6C2)', () => {
       tableService,
       handHistory,
     );
-    gateway = new RoomGateway(roomService, gameService, gameBroadcast);
+    gateway = new RoomGateway(
+      roomService,
+      gameService,
+      gameBroadcast,
+      new ChatService(),
+    );
     gateway.onModuleInit();
 
     httpServer = createServer();

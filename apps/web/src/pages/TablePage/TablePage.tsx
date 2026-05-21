@@ -5,7 +5,6 @@ import { useParams } from 'react-router-dom';
 
 import { ActionBar } from '../../components/action-bar/ActionBar';
 import { BoardCards } from '../../components/cards/BoardCards';
-import { HeroHoleCards } from '../../components/cards/HeroHoleCards';
 import { HandResultBanner } from '../../components/result/HandResultBanner';
 import { SeatLayer } from '../../components/seats/SeatLayer';
 import { Pot } from '../../components/table/Pot';
@@ -22,14 +21,18 @@ import {
 } from '../../lib/gameStateAdapter';
 import { formatChips } from '../../lib/formatChips';
 import { gameStateMatchesRoomRoster } from '../../lib/gameStateRoster';
+import { chatRowsFromMessages } from '../../lib/chatAdapter';
 import { formatRoomMetaLine } from '../../lib/tableRoomMeta';
 import {
   rebuy,
+  requestChatMessages,
   requestGameState,
   requestHandHistory,
+  sendChatMessage,
   sendPlayerAction,
   startHand,
 } from '../../net/socket';
+import { useChatStore } from '../../state/chatStore';
 import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
@@ -44,6 +47,8 @@ export function TablePage() {
   const isGameLoading = useGameStore((s) => s.isGameLoading);
   const isSubmittingAction = useGameStore((s) => s.isSubmittingAction);
   const gameError = useGameStore((s) => s.gameError);
+  const chatMessages = useChatStore((s) => s.chatMessages);
+  const chatError = useChatStore((s) => s.chatError);
   const roomState = useRoomStore((s) => s.roomState);
 
   const isLiveRoom = Boolean(roomId);
@@ -81,6 +86,11 @@ export function TablePage() {
 
   useEffect(() => {
     if (!roomId) return;
+    useChatStore.getState().clearChatMessages();
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) return;
     const cached = useGameStore.getState().gameState;
     if (cached?.tableId !== roomId) {
       useGameStore.getState().clearGameState();
@@ -89,6 +99,36 @@ export function TablePage() {
     requestGameState(roomId);
     requestHandHistory(roomId);
   }, [roomId]);
+
+  useEffect(() => {
+    if (
+      !roomId ||
+      connectionStatus !== 'connected' ||
+      roomState?.roomId !== roomId
+    ) {
+      return;
+    }
+    requestChatMessages(roomId);
+  }, [roomId, connectionStatus, roomState?.roomId]);
+
+  const chatRows = useMemo(
+    () => chatRowsFromMessages(chatMessages),
+    [chatMessages],
+  );
+
+  const chatDisabled =
+    !isLiveRoom ||
+    connectionStatus !== 'connected' ||
+    roomId == null ||
+    roomState?.roomId !== roomId;
+
+  const handleSendChat = useCallback(
+    (text: string) => {
+      if (roomId == null || chatDisabled) return;
+      sendChatMessage(roomId, text);
+    },
+    [roomId, chatDisabled],
+  );
 
   const tableView = useMemo(() => {
     if (!isLiveRoom) {
@@ -297,15 +337,13 @@ export function TablePage() {
           reveal={tableView.boardReveal}
         />
       ) : null}
-      {tableView.heroHoleCards ? (
-        <HeroHoleCards cards={tableView.heroHoleCards} />
-      ) : null}
       <SeatLayer
         layout={tableView.layout}
         playersBySeatIndex={tableView.playersBySeatIndex}
         seatStatesBySeatIndex={tableView.seatStatesBySeatIndex}
         gameState={tableView.gameState}
         handActive={handActive}
+        heroHoleCards={tableView.heroHoleCards}
       />
       {handInProgress ? (
         <ActionBar
@@ -325,7 +363,10 @@ export function TablePage() {
       ) : null}
       <RightSidebar
         handHistory={handHistory}
-        chatMessages={tableView.chatMessages}
+        chatMessages={chatRows}
+        chatDisabled={chatDisabled}
+        chatError={chatError}
+        onSendChat={handleSendChat}
         gameInfo={tableView.gameInfo}
       />
     </div>

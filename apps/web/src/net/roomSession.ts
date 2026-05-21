@@ -6,6 +6,7 @@ import {
   connectSocket,
   joinRoom,
   registerNickname,
+  requestChatMessages,
   requestGameState,
   requestHandHistory,
 } from './socket';
@@ -40,6 +41,7 @@ export async function establishRoomSession(
 
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);
+  requestChatMessages(room.roomId);
 
   return { room, roomId: room.roomId };
 }
@@ -64,6 +66,7 @@ export async function reconnectRoomSession(
 
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);
+  requestChatMessages(room.roomId);
 
   return { room, roomId: room.roomId };
 }
