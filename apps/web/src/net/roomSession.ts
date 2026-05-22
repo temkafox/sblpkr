@@ -1,6 +1,7 @@
 import type { GetRoomResponse } from '@neonpoker/shared';
 
 import { getOrCreateClientSessionId } from '../lib/clientSession';
+import { ensureRoomStateSettings } from '../lib/roomSettingsForm';
 import { getRoom } from './roomsApi';
 import {
   connectSocket,
@@ -41,6 +42,17 @@ export async function establishRoomSession(
     roomId: room.roomId,
   });
 
+  useRoomStore.getState().setRoomState(
+    ensureRoomStateSettings({
+      roomId: room.roomId,
+      code: room.code,
+      maxSeats: room.maxSeats,
+      status: room.status,
+      players: [],
+      settings: room.settings,
+    }),
+  );
+
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);
   requestChatMessages(room.roomId);
@@ -67,6 +79,17 @@ export async function reconnectRoomSession(
     nickname,
     roomId: room.roomId,
   });
+
+  useRoomStore.getState().setRoomState(
+    ensureRoomStateSettings({
+      roomId: room.roomId,
+      code: room.code,
+      maxSeats: room.maxSeats,
+      status: room.status,
+      players: [],
+      settings: room.settings,
+    }),
+  );
 
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);

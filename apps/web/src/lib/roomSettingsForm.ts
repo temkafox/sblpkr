@@ -3,6 +3,7 @@ import {
   mergeRoomSettings,
   type RoomSettings,
   type RoomSettingsPartial,
+  type RoomStatePayload,
 } from '@neonpoker/shared';
 
 export type CreateRoomSettingsFormState = {
@@ -144,6 +145,43 @@ export function formToPartial(
   };
 }
 
+/** Fallback when REST/socket payloads omit settings (older servers). */
+export function resolveRoomSettings(
+  room:
+    | { readonly maxSeats?: number; readonly settings?: RoomSettings | null }
+    | null
+    | undefined,
+): RoomSettings {
+  const raw = room?.settings;
+  if (
+    raw != null &&
+    typeof raw.startingStack === 'number' &&
+    typeof raw.smallBlind === 'number' &&
+    typeof raw.bigBlind === 'number'
+  ) {
+    return raw;
+  }
+
+  const maxSeats =
+    room?.maxSeats === 2 ||
+    room?.maxSeats === 4 ||
+    room?.maxSeats === 6 ||
+    room?.maxSeats === 9
+      ? room.maxSeats
+      : DEFAULT_ROOM_SETTINGS.maxSeats;
+
+  return { ...DEFAULT_ROOM_SETTINGS, maxSeats };
+}
+
+export function ensureRoomStateSettings(
+  room: RoomStatePayload,
+): RoomStatePayload {
+  return {
+    ...room,
+    settings: resolveRoomSettings(room),
+  };
+}
+
 export function formatRebuyLimit(
   maxRebuysPerPlayer: number | null | undefined,
 ): string {
@@ -153,7 +191,7 @@ export function formatRebuyLimit(
 }
 
 export function gameInfoFromRoomSettings(
-  settings: RoomSettings,
+  settings: RoomSettings | null | undefined,
   playerCount: number,
 ): {
   gameType: string;
@@ -165,18 +203,17 @@ export function gameInfoFromRoomSettings(
   maxSeats: number;
   nextBreak: string;
 } {
+  const s = settings ?? DEFAULT_ROOM_SETTINGS;
   const name =
-    settings.roomName.trim().length > 0
-      ? settings.roomName.trim()
-      : 'Neon Table';
+    s.roomName.trim().length > 0 ? s.roomName.trim() : 'Neon Table';
   return {
     gameType: name,
-    stakes: `$${settings.smallBlind} / $${settings.bigBlind}`,
-    buyIn: `$${settings.startingStack}`,
-    rebuyLine: `$${settings.rebuyAmount} (${formatRebuyLimit(settings.maxRebuysPerPlayer)})`,
-    turnTimer: `${settings.actionTimeoutSeconds}s`,
+    stakes: `$${s.smallBlind} / $${s.bigBlind}`,
+    buyIn: `$${s.startingStack}`,
+    rebuyLine: `$${s.rebuyAmount} (${formatRebuyLimit(s.maxRebuysPerPlayer)})`,
+    turnTimer: `${s.actionTimeoutSeconds}s`,
     playerCount,
-    maxSeats: settings.maxSeats,
+    maxSeats: s.maxSeats,
     nextBreak: '—',
   };
 }

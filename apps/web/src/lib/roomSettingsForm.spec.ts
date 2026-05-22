@@ -4,6 +4,7 @@ import {
   CREATE_ROOM_SETTINGS_DEFAULTS,
   formToPartial,
   gameInfoFromRoomSettings,
+  resolveRoomSettings,
   validateCreateRoomSettingsForm,
 } from './roomSettingsForm';
 import { DEFAULT_ROOM_SETTINGS, mergeRoomSettings } from '@neonpoker/shared';
@@ -24,6 +25,13 @@ describe('roomSettingsForm', () => {
     expect(errors.startingStack ?? errors._form).toBeTruthy();
   });
 
+  it('resolveRoomSettings falls back when settings missing', () => {
+    expect(resolveRoomSettings({ maxSeats: 6 })).toEqual({
+      ...DEFAULT_ROOM_SETTINGS,
+      maxSeats: 6,
+    });
+  });
+
   it('gameInfoFromRoomSettings formats blinds and rebuy line', () => {
     const info = gameInfoFromRoomSettings(
       mergeRoomSettings({ smallBlind: 5, bigBlind: 10, rebuyAmount: 500, maxRebuysPerPlayer: 1 }),
@@ -33,5 +41,11 @@ describe('roomSettingsForm', () => {
     expect(info.rebuyLine).toContain('500');
     expect(info.rebuyLine).toContain('1');
     expect(info.playerCount).toBe(2);
+  });
+
+  it('gameInfoFromRoomSettings tolerates undefined settings', () => {
+    const info = gameInfoFromRoomSettings(undefined, 0);
+    expect(info.gameType).toBe('Neon Table');
+    expect(info.stakes).toBe('$1 / $2');
   });
 });

@@ -7,7 +7,10 @@ import {
 } from '@neonpoker/shared';
 
 import { LAYOUTS, type SeatCount } from './layout';
-import { gameInfoFromRoomSettings } from './roomSettingsForm';
+import {
+  gameInfoFromRoomSettings,
+  resolveRoomSettings,
+} from './roomSettingsForm';
 import type {
   ActionBarMock,
   BoardReveal,
@@ -152,7 +155,7 @@ export function viewerRebuyAmount(
   _gameState: PlayerGameState | null,
   room: RoomStatePayload | null,
 ): number {
-  return room?.settings.rebuyAmount ?? 200;
+  return resolveRoomSettings(room).rebuyAmount;
 }
 
 export function viewerRebuyDisabledReason(
@@ -702,7 +705,7 @@ export function adaptRoomLobbyState(
     heroHoleCards: null,
     handHistory: [],
     chatMessages: [],
-    gameInfo: baseLiveGameInfo(occupiedCount, room.settings),
+    gameInfo: baseLiveGameInfo(occupiedCount, resolveRoomSettings(room)),
     actionBar: idleActionBar(),
     layout,
     playersBySeatIndex,
@@ -835,17 +838,10 @@ export function adaptPlayerGameState(
     chatMessages: [],
     gameInfo: baseLiveGameInfo(
       occupiedCount,
-      room?.settings ?? {
-        ...DEFAULT_ROOM_SETTINGS,
-        maxSeats: (state.maxSeats === 2 ||
-        state.maxSeats === 4 ||
-        state.maxSeats === 6 ||
-        state.maxSeats === 9
-          ? state.maxSeats
-          : DEFAULT_ROOM_SETTINGS.maxSeats) as typeof DEFAULT_ROOM_SETTINGS.maxSeats,
-        actionTimeoutSeconds:
-          state.actionTimeoutSeconds ?? DEFAULT_ROOM_SETTINGS.actionTimeoutSeconds,
-      },
+      resolveRoomSettings({
+        maxSeats: room?.maxSeats ?? state.maxSeats,
+        settings: room?.settings,
+      }),
     ),
     actionBar: buildActionBar(state, viewerServerSeatIndex),
     layout,
