@@ -95,9 +95,11 @@ export function JoinRoomPage() {
     setPanelError(null);
     setBusy(true);
     try {
+      console.info('[neonpoker] join start', lookup);
       const { roomId } = await establishRoomSession(nickNorm, lookup);
       navigate(`/table/${encodeURIComponent(roomId)}`);
     } catch (err) {
+      console.error('[neonpoker] join flow failed', err);
       setPanelError(formatJoinError(err));
     } finally {
       setBusy(false);
@@ -123,9 +125,16 @@ export function JoinRoomPage() {
     setBusy(true);
     try {
       const created = await createRoom();
-      const { roomId } = await establishRoomSession(nickNorm, created.roomId);
+      const lookup = created?.roomId?.trim();
+      if (!lookup) {
+        console.error('[neonpoker] createRoom missing roomId', created);
+        throw new Error('Server did not return a room id');
+      }
+      console.info('[neonpoker] createRoom ok', lookup);
+      const { roomId } = await establishRoomSession(nickNorm, lookup);
       navigate(`/table/${encodeURIComponent(roomId)}`);
     } catch (err) {
+      console.error('[neonpoker] createRoom flow failed', err);
       setPanelError(formatJoinError(err));
     } finally {
       setBusy(false);
