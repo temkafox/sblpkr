@@ -20,6 +20,24 @@ export type EstablishRoomSessionResult = {
   roomId: string;
 };
 
+/** Merge REST metadata without replacing roster from SERVER_ROOM_STATE. */
+function patchRoomSettingsFromRest(room: GetRoomResponse): void {
+  const current = useRoomStore.getState().roomState;
+  if (current == null || current.roomId !== room.roomId) {
+    return;
+  }
+
+  useRoomStore.getState().setRoomState(
+    ensureRoomStateSettings({
+      ...current,
+      code: room.code,
+      maxSeats: room.maxSeats,
+      status: room.status,
+      settings: room.settings,
+    }),
+  );
+}
+
 /** REST lookup, socket connect, nickname registration, and room join (first visit). */
 export async function establishRoomSession(
   nickname: string,
@@ -42,16 +60,7 @@ export async function establishRoomSession(
     roomId: room.roomId,
   });
 
-  useRoomStore.getState().setRoomState(
-    ensureRoomStateSettings({
-      roomId: room.roomId,
-      code: room.code,
-      maxSeats: room.maxSeats,
-      status: room.status,
-      players: [],
-      settings: room.settings,
-    }),
-  );
+  patchRoomSettingsFromRest(room);
 
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);
@@ -80,16 +89,7 @@ export async function reconnectRoomSession(
     roomId: room.roomId,
   });
 
-  useRoomStore.getState().setRoomState(
-    ensureRoomStateSettings({
-      roomId: room.roomId,
-      code: room.code,
-      maxSeats: room.maxSeats,
-      status: room.status,
-      players: [],
-      settings: room.settings,
-    }),
-  );
+  patchRoomSettingsFromRest(room);
 
   requestGameState(room.roomId);
   requestHandHistory(room.roomId);

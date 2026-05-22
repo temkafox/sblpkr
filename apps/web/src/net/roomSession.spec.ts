@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as roomsApi from './roomsApi';
 import * as socket from './socket';
-import { mockGetRoomResponse } from '../test/roomFixtures';
+import { mockGetRoomResponse, mockRoomState } from '../test/roomFixtures';
+import { useRoomStore } from '../state/roomStore';
 import { establishRoomSession, reconnectRoomSession } from './roomSession';
 
 vi.mock('./roomsApi', () => ({
@@ -31,7 +32,25 @@ describe('roomSession', () => {
   });
 
   it('establishRoomSession requests chat after join', async () => {
+    vi.mocked(socket.joinRoom).mockImplementation(async (roomId) => {
+      const state = mockRoomState({
+        roomId,
+        players: [
+          {
+            playerId: 'p1',
+            nickname: 'Alice',
+            seatIndex: 0,
+            connectionStatus: 'connected',
+          },
+        ],
+      });
+      useRoomStore.getState().setRoomState(state);
+      return state;
+    });
+
     await establishRoomSession('Alice', roomResponse.roomId);
+
+    expect(useRoomStore.getState().roomState?.players).toHaveLength(1);
     expect(socket.requestChatMessages).toHaveBeenCalledWith(roomResponse.roomId);
   });
 
