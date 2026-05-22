@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as roomSession from './net/roomSession';
+import * as socketNet from './net/socket';
 import {
   clearTableRouteReconnectKeysForTests,
   TableRoute,
@@ -14,6 +15,14 @@ vi.mock('./net/roomSession', () => ({
   establishRoomSession: vi.fn(),
   reconnectRoomSession: vi.fn(),
 }));
+
+vi.mock('./net/socket', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./net/socket')>();
+  return {
+    ...actual,
+    getSocket: vi.fn(() => null),
+  };
+});
 
 const roomId = '11111111-1111-4111-8111-111111111111';
 
@@ -56,6 +65,10 @@ describe('TableRoute guard', () => {
   });
 
   it('renders TablePage when nickname is present', async () => {
+    vi.mocked(socketNet.getSocket).mockReturnValue({
+      connected: true,
+    } as ReturnType<typeof socketNet.getSocket>);
+
     useSessionStore.setState({
       nickname: 'alice',
       roomId,
@@ -79,7 +92,44 @@ describe('TableRoute guard', () => {
     });
 
     expect(router.state.location.pathname).toBe(`/table/${roomId}`);
-    expect(roomSession.establishRoomSession).not.toHaveBeenCalled();
+    expect(roomSession.reconnectRoomSession).not.toHaveBeenCalled();
+  });
+
+  it('reconnects when store says connected but socket is dead', async () => {
+    vi.mocked(socketNet.getSocket).mockReturnValue(null);
+    vi.mocked(roomSession.reconnectRoomSession).mockResolvedValue({
+      room: {
+        roomId,
+        code: 'ABC123',
+        maxSeats: 9,
+        status: 'waiting',
+        seatedCount: 0,
+        capacityAvailable: true,
+      },
+      roomId,
+    });
+
+    useSessionStore.setState({
+      nickname: 'alice',
+      roomId,
+      connectionStatus: 'connected',
+    });
+    useRoomStore.setState({
+      roomState: {
+        roomId,
+        code: 'ABC123',
+        maxSeats: 9,
+        players: [],
+        status: 'waiting',
+      },
+      lastError: null,
+    });
+
+    renderGuard(`/table/${roomId}`);
+
+    await waitFor(() => {
+      expect(roomSession.reconnectRoomSession).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('attempts reconnect once when disconnected', async () => {

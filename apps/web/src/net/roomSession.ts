@@ -29,7 +29,9 @@ export async function establishRoomSession(
   useSessionStore.getState().setConnectionStatus('connecting');
 
   const clientSessionId = getOrCreateClientSessionId();
+  console.info('[neonpoker] getRoom', roomLookup);
   const room = await getRoom(roomLookup);
+  console.info('[neonpoker] getRoom ok', room.roomId);
   await connectSocket();
   registerNickname(nickname, clientSessionId);
   await joinRoom(room.roomId, clientSessionId);
@@ -54,7 +56,9 @@ export async function reconnectRoomSession(
   useSessionStore.getState().setConnectionStatus('connecting');
 
   const clientSessionId = getOrCreateClientSessionId();
+  console.info('[neonpoker] getRoom', roomLookup);
   const room = await getRoom(roomLookup);
+  console.info('[neonpoker] getRoom ok', room.roomId);
   await connectSocket();
   registerNickname(nickname, clientSessionId);
   await joinRoom(room.roomId, clientSessionId);

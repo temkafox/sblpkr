@@ -49,6 +49,7 @@ import {
 import { getApiBaseUrl } from './http';
 
 const JOIN_TIMEOUT_MS = 8_000;
+const CONNECT_TIMEOUT_MS = 15_000;
 
 let socket: Socket | null = null;
 let listenersAttached = false;
@@ -191,10 +192,16 @@ export async function connectSocket(): Promise<Socket> {
     return socket;
   }
 
+  if (socket) {
+    disconnectSocket();
+  }
+
+  const baseUrl = getApiBaseUrl();
   setConnectionStatus('connecting');
+  console.info('[neonpoker] socket connect', baseUrl, SOCKET_IO_PATH);
 
   return new Promise((resolve, reject) => {
-    const client = io(getApiBaseUrl(), {
+    const client = io(baseUrl, {
       path: SOCKET_IO_PATH,
       transports: ['polling', 'websocket'],
       autoConnect: true,
@@ -204,6 +211,7 @@ export async function connectSocket(): Promise<Socket> {
     const onConnect = () => {
       cleanup();
       attachGlobalListeners(client);
+      console.info('[neonpoker] socket connected');
       resolve(client);
     };
 
@@ -212,13 +220,24 @@ export async function connectSocket(): Promise<Socket> {
       socket = null;
       listenersAttached = false;
       setConnectionStatus('error');
+      console.error('[neonpoker] socket connect_error', err);
       reject(err);
     };
 
     const cleanup = () => {
+      clearTimeout(connectTimer);
       client.off('connect', onConnect);
       client.off('connect_error', onConnectError);
     };
+
+    const connectTimer = setTimeout(() => {
+      cleanup();
+      client.disconnect();
+      socket = null;
+      listenersAttached = false;
+      setConnectionStatus('error');
+      reject(new Error('Socket connection timed out'));
+    }, CONNECT_TIMEOUT_MS);
 
     client.on('connect', onConnect);
     client.on('connect_error', onConnectError);

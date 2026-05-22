@@ -3,6 +3,7 @@ import { Navigate, useParams } from 'react-router-dom';
 
 import { TablePage } from '../pages/TablePage/TablePage';
 import { reconnectRoomSession } from '../net/roomSession';
+import { getSocket } from '../net/socket';
 import { useRoomStore } from '../state/roomStore';
 import { useSessionStore } from '../state/sessionStore';
 
@@ -27,7 +28,9 @@ export function TableRoute() {
 
     const session = useSessionStore.getState();
     const room = useRoomStore.getState().roomState;
+    const liveSocket = getSocket()?.connected === true;
     if (
+      liveSocket &&
       session.connectionStatus === 'connected' &&
       room?.roomId === roomId
     ) {
@@ -36,8 +39,9 @@ export function TableRoute() {
 
     reconnectKeys.add(reconnectKey);
 
-    void reconnectRoomSession(nick, roomId).catch(() => {
-      /* errors surface via roomStore; table keeps static mock UI */
+    void reconnectRoomSession(nick, roomId).catch((err) => {
+      reconnectKeys.delete(reconnectKey);
+      console.error('[neonpoker] table reconnect failed', err);
     });
   }, [roomId, nickname]);
 
