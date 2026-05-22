@@ -10,6 +10,7 @@ import {
 } from './routes/TableRoute';
 import { useRoomStore } from './state/roomStore';
 import { useSessionStore } from './state/sessionStore';
+import { mockGetRoomResponse, mockRoomState } from './test/roomFixtures';
 
 vi.mock('./net/roomSession', () => ({
   establishRoomSession: vi.fn(),
@@ -75,13 +76,7 @@ describe('TableRoute guard', () => {
       connectionStatus: 'connected',
     });
     useRoomStore.setState({
-      roomState: {
-        roomId,
-        code: 'ABC123',
-        maxSeats: 9,
-        players: [],
-        status: 'waiting',
-      },
+      roomState: mockRoomState({ roomId }),
       lastError: null,
     });
 
@@ -98,14 +93,7 @@ describe('TableRoute guard', () => {
   it('reconnects when store says connected but socket is dead', async () => {
     vi.mocked(socketNet.getSocket).mockReturnValue(null);
     vi.mocked(roomSession.reconnectRoomSession).mockResolvedValue({
-      room: {
-        roomId,
-        code: 'ABC123',
-        maxSeats: 9,
-        status: 'waiting',
-        seatedCount: 0,
-        capacityAvailable: true,
-      },
+      room: mockGetRoomResponse({ roomId }),
       roomId,
     });
 
@@ -115,13 +103,7 @@ describe('TableRoute guard', () => {
       connectionStatus: 'connected',
     });
     useRoomStore.setState({
-      roomState: {
-        roomId,
-        code: 'ABC123',
-        maxSeats: 9,
-        players: [],
-        status: 'waiting',
-      },
+      roomState: mockRoomState({ roomId }),
       lastError: null,
     });
 
@@ -134,14 +116,7 @@ describe('TableRoute guard', () => {
 
   it('attempts reconnect once when disconnected', async () => {
     vi.mocked(roomSession.reconnectRoomSession).mockResolvedValue({
-      room: {
-        roomId,
-        code: 'ABC123',
-        maxSeats: 9,
-        status: 'waiting',
-        seatedCount: 0,
-        capacityAvailable: true,
-      },
+      room: mockGetRoomResponse({ roomId }),
       roomId,
     });
 

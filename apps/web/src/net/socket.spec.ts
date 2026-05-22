@@ -27,6 +27,7 @@ import { useChatStore } from '../state/chatStore';
 import { useGameStore } from '../state/gameStore';
 import { useRoomStore } from '../state/roomStore';
 import { useSessionStore } from '../state/sessionStore';
+import { mockRoomState } from '../test/roomFixtures';
 import {
   connectSocket,
   joinRoom,
@@ -41,13 +42,7 @@ import {
   startHand,
 } from './socket';
 
-const roomState: RoomStatePayload = {
-  roomId: '11111111-1111-4111-8111-111111111111',
-  code: 'ABC123',
-  maxSeats: 9,
-  players: [],
-  status: 'waiting',
-};
+const roomState: RoomStatePayload = mockRoomState();
 
 const gameState: PlayerGameState = {
   tableId: roomState.roomId,

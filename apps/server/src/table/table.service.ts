@@ -3,11 +3,6 @@ import type { CoreGameState } from '@neonpoker/poker-core';
 import { createInitialGameState } from '@neonpoker/poker-core';
 import type { HandResultPayload } from '@neonpoker/shared';
 
-import {
-  DEFAULT_BIG_BLIND,
-  DEFAULT_SMALL_BLIND,
-  DEFAULT_STARTING_CHIPS,
-} from '../game/game.constants';
 import type { MutableInternalRoom } from '../room/room.types';
 import { syncTableToRoom } from './table-roster-sync';
 
@@ -48,17 +43,18 @@ export class TableService {
   /** Builds a fresh core table from the current room roster (join order → seat index). */
 
   createTableForRoom(room: MutableInternalRoom): CoreGameState {
+    const { startingStack, smallBlind, bigBlind } = room.settings;
     const state = createInitialGameState({
       table: {
         tableId: room.roomId,
         maxSeats: room.maxSeats,
-        smallBlind: DEFAULT_SMALL_BLIND,
-        bigBlind: DEFAULT_BIG_BLIND,
+        smallBlind,
+        bigBlind,
       },
       players: room.players.map((player, seatIndex) => ({
         playerId: player.playerId,
         seatIndex,
-        startingChips: DEFAULT_STARTING_CHIPS,
+        startingChips: startingStack,
       })),
     });
 

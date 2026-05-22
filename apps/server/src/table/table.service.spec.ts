@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ROOM_SETTINGS } from '@neonpoker/shared';
 
 import {
   DEFAULT_BIG_BLIND,
@@ -16,6 +17,8 @@ function sampleRoom(overrides?: Partial<MutableInternalRoom>): MutableInternalRo
     maxSeats: 6,
     status: 'waiting',
     hostPlayerId: 'p0',
+    settings: DEFAULT_ROOM_SETTINGS,
+    actionDeadlineAt: null,
     players: [
       {
         playerId: 'p0',
@@ -24,6 +27,7 @@ function sampleRoom(overrides?: Partial<MutableInternalRoom>): MutableInternalRo
         clientSessionId: 'ts-p0',
         socketId: 'sock-0',
         connectionStatus: 'connected',
+        rebuyCount: 0,
       },
       {
         playerId: 'p1',
@@ -32,6 +36,7 @@ function sampleRoom(overrides?: Partial<MutableInternalRoom>): MutableInternalRo
         clientSessionId: 'ts-p1',
         socketId: 'sock-1',
         connectionStatus: 'connected',
+        rebuyCount: 0,
       },
     ],
     ...overrides,

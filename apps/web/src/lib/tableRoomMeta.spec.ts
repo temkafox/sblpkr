@@ -2,17 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { PlayerGameState, RoomStatePayload } from '@neonpoker/shared';
 
 import { formatHandPhaseLabel, formatRoomMetaLine } from './tableRoomMeta';
+import { mockRoomState } from '../test/roomFixtures';
 
-const room: RoomStatePayload = {
+const room: RoomStatePayload = mockRoomState({
   roomId: 'room-1',
-  code: 'ABC123',
-  maxSeats: 9,
-  status: 'waiting',
   players: [
     { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
     { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
   ],
-};
+});
 
 const baseGame: PlayerGameState = {
   tableId: 'room-1',

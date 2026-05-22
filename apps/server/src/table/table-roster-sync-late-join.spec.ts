@@ -40,7 +40,7 @@ describe('syncTableToRoom late joiner', () => {
   it('adds mid-hand joiner as sitting out without extending participants', () => {
     const roomService = RoomService.forTest();
     const tableService = new TableService();
-    const created = roomService.createRoom({ maxSeats: 6 });
+    const created = roomService.createRoom({ settings: { maxSeats: 6 } });
     joinPlayer(roomService, created.roomId, 'ASD', 'a');
     joinPlayer(roomService, created.roomId, '3fff', 'b');
 
@@ -86,7 +86,7 @@ describe('GameService late joiner', () => {
     const tableService = new TableService();
     const game = GameService.forTest({ roomService, tableService });
 
-    const created = roomService.createRoom({ maxSeats: 6 });
+    const created = roomService.createRoom({ settings: { maxSeats: 6 } });
     joinPlayer(roomService, created.roomId, 'ASD', 'a');
     joinPlayer(roomService, created.roomId, '3fff', 'b');
     game.startHand(created.roomId);

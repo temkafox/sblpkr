@@ -11,6 +11,7 @@ import { RoomGateway } from '../room/room.gateway';
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
 import { applySeatEligibility, syncTableToRoom } from '../table/table-roster-sync';
+import { ActionTimerService } from './action-timer.service';
 import { GameBroadcastService } from './game-broadcast';
 import { HandHistoryService } from './hand-history.service';
 import { GameOrchestrationError } from './game.errors';
@@ -18,7 +19,7 @@ import { GameService } from './game.service';
 import { NextHandReadyService } from './next-hand-ready.service';
 
 function seatRoom(roomService: RoomService, count: number): string {
-  const room = roomService.createRoom({ maxSeats: 9 });
+  const room = roomService.createRoom({ settings: { maxSeats: 9 } });
   for (let i = 0; i < count; i++) {
     const nick = `Player_${i}`;
     const reg = roomService.registerNickname(`sock-${i}`, {
@@ -225,12 +226,19 @@ describe('NextHandReadyService (Phase 9B)', () => {
       handHistory,
       nextHandReady,
     );
+    const actionTimer = new ActionTimerService(
+      roomService,
+      game,
+      gameBroadcast,
+      handHistory,
+    );
     const gateway = new RoomGateway(
       roomService,
       game,
       gameBroadcast,
       nextHandReady,
       new ChatService(),
+      actionTimer,
     );
 
     const roomId = seatRoom(roomService, 2);

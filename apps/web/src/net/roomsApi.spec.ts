@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getApiBaseUrl } from './http';
 import { createRoom, getRoom } from './roomsApi';
 
 describe('roomsApi', () => {
@@ -27,13 +28,15 @@ describe('roomsApi', () => {
       json: async () => body,
     } as Response);
 
-    const result = await createRoom(9);
+    const result = await createRoom({ maxSeats: 6, actionTimeoutSeconds: 15 });
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:3000/rooms',
+      `${getApiBaseUrl()}/rooms`,
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ maxSeats: 9 }),
+        body: JSON.stringify({
+          settings: { maxSeats: 6, actionTimeoutSeconds: 15 },
+        }),
       }),
     );
     expect(result).toEqual(body);
@@ -58,7 +61,7 @@ describe('roomsApi', () => {
     const result = await getRoom('ABC123');
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:3000/rooms/ABC123',
+      `${getApiBaseUrl()}/rooms/ABC123`,
       expect.any(Object),
     );
     expect(result).toEqual(body);

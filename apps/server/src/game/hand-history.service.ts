@@ -182,6 +182,24 @@ export class HandHistoryService {
     }
   }
 
+  onTimeoutAction(
+    room: MutableInternalRoom,
+    state: CoreGameState,
+    seatIndex: SeatIndex,
+    kind: 'check' | 'fold',
+  ): void {
+    const store = this.ensureRoom(room.roomId);
+    const nickname = nicknameForSeat(room, seatIndex);
+    const cls = colorForSeat(seatIndex);
+    const street = (state.hand?.street ?? 'PRE-FLOP') as Street;
+    const verb = kind === 'check' ? 'checked' : 'folded';
+    this.push(store, street, `${nickname} timed out — ${verb}`, {
+      nickname,
+      nameColor: cls,
+      actionKind: kind === 'check' ? 'timeout_check' : 'timeout_fold',
+    });
+  }
+
   onRebuy(
     room: MutableInternalRoom,
     seatIndex: SeatIndex,

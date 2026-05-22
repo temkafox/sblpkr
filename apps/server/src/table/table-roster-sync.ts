@@ -7,11 +7,6 @@ import {
   needsToAct,
 } from '@neonpoker/poker-core';
 
-import {
-  DEFAULT_BIG_BLIND,
-  DEFAULT_SMALL_BLIND,
-  DEFAULT_STARTING_CHIPS,
-} from '../game/game.constants';
 import type { MutableInternalRoom } from '../room/room.types';
 
 function appendActedSeat(
@@ -147,7 +142,7 @@ export function syncTableToRoom(
         ...createInitialPlayerState({
           playerId: member.playerId,
           seatIndex: i,
-          startingChips: DEFAULT_STARTING_CHIPS,
+          startingChips: room.settings.startingStack,
         }),
         isSittingOut: waitingForNextHand,
       });
@@ -184,8 +179,8 @@ export function syncTableToRoom(
   const table = Object.freeze({
     ...existing.table,
     tableId: room.roomId,
-    smallBlind: existing.table.smallBlind || DEFAULT_SMALL_BLIND,
-    bigBlind: existing.table.bigBlind || DEFAULT_BIG_BLIND,
+    smallBlind: existing.table.smallBlind || room.settings.smallBlind,
+    bigBlind: existing.table.bigBlind || room.settings.bigBlind,
     seats: Object.freeze(seats),
   });
 

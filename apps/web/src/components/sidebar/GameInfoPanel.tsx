@@ -22,9 +22,21 @@ export function GameInfoPanel({ info }: GameInfoPanelProps) {
           <span className="np-gi-val">{info.stakes}</span>
         </div>
         <div className="np-gi-row">
-          <span>Buy-in</span>
+          <span>Starting stack</span>
           <span className="np-gi-val">{info.buyIn}</span>
         </div>
+        {info.rebuyLine != null ? (
+          <div className="np-gi-row">
+            <span>Rebuy</span>
+            <span className="np-gi-val">{info.rebuyLine}</span>
+          </div>
+        ) : null}
+        {info.turnTimer != null ? (
+          <div className="np-gi-row">
+            <span>Turn timer</span>
+            <span className="np-gi-val">{info.turnTimer}</span>
+          </div>
+        ) : null}
         <div className="np-gi-row">
           <span>Players</span>
           <span className="np-gi-val">

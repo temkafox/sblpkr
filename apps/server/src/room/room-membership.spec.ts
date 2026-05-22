@@ -93,7 +93,7 @@ describe('RoomService membership (Phase 6B)', () => {
 
   it('joins existing room by roomId and code', () => {
     const svc = testService();
-    const room = svc.createRoom({ maxSeats: 6 });
+    const room = svc.createRoom({ settings: { maxSeats: 6 } });
 
     register(svc, 'sock-a', 'Alpha', sessionId('a'));
     const byId = join(svc, 'sock-a', room.roomId, sessionId('a'));
@@ -158,7 +158,7 @@ describe('RoomService membership (Phase 6B)', () => {
       id: () => roomIds.a,
     });
 
-    const room = svc.createRoom({ maxSeats: 2 });
+    const room = svc.createRoom({ settings: { maxSeats: 2 } });
 
     for (const nick of ['Player_One', 'Player_Two', 'Player_Three']) {
       const sid = sessionId(nick);
@@ -271,7 +271,7 @@ describe('RoomService reconnect (F5)', () => {
 
   it('reconnect with same clientSessionId keeps playerId and seat', () => {
     const svc = svcWithGrace();
-    const room = svc.createRoom({ maxSeats: 6 });
+    const room = svc.createRoom({ settings: { maxSeats: 6 } });
     const clientSid = 'session-alpha';
 
     register(svc, 'sock-a', 'Alpha', clientSid);

@@ -2,6 +2,7 @@ import './Seats.css';
 
 import { Avatar } from './Avatar';
 import { OppHoles } from './OppHoles';
+import { actionTimerBarStyle } from '../../lib/actionTimerDisplay';
 import { formatChips } from '../../lib/formatChips';
 import { seatStatusLabel } from '../../lib/seatStatusLabel';
 import type { SeatPosition } from '../../lib/layout';
@@ -78,6 +79,7 @@ export function PlayerSeat({
   const w = pos.w || 244;
   const h = pos.h || 84;
   const states = opponentStateClass(st.status);
+  const timerBarStyle = actionTimerBarStyle(st.actionDeadlineAt);
 
   return (
     <div className={`seat ${states}`} style={{ left: pos.x, top: pos.y, width: w, height: h }}>
@@ -91,7 +93,11 @@ export function PlayerSeat({
           <div className={`status ${opponentStatusClass(st.status)}`}>{opponentStatusText(st)}</div>
         </div>
         <div className="timer">
-          <div className="bar" key={`${player.id}-${st.status}`} />
+          <div
+            className="bar"
+            key={`${player.id}-${st.actionDeadlineAt ?? st.status}`}
+            style={timerBarStyle}
+          />
         </div>
       </div>
       <Avatar player={player} />

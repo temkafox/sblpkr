@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as roomsApi from './roomsApi';
 import * as socket from './socket';
+import { mockGetRoomResponse } from '../test/roomFixtures';
 import { establishRoomSession, reconnectRoomSession } from './roomSession';
 
 vi.mock('./roomsApi', () => ({
@@ -21,14 +22,7 @@ vi.mock('../lib/clientSession', () => ({
   getOrCreateClientSessionId: () => 'client-session-1',
 }));
 
-const roomResponse = {
-  roomId: '11111111-1111-4111-8111-111111111111',
-  code: 'ABC123',
-  maxSeats: 9 as const,
-  status: 'waiting' as const,
-  seatedCount: 1,
-  capacityAvailable: true,
-};
+const roomResponse = mockGetRoomResponse({ seatedCount: 1 });
 
 describe('roomSession', () => {
   beforeEach(() => {

@@ -15,7 +15,7 @@ import { GameService } from './game.service';
 import { toPlayerGameState } from './game-state-view';
 
 function seatRoom(roomService: RoomService, count: number): string {
-  const room = roomService.createRoom({ maxSeats: 6 });
+  const room = roomService.createRoom({ settings: { maxSeats: 6 } });
   for (let i = 0; i < count; i++) {
     const sid = `sock-${i}`;
     roomService.registerNickname(sid, {
@@ -272,6 +272,128 @@ describe('GameService.rebuy (Phase 7G)', () => {
     const next = game.startHand(roomId);
     expect(getPlayerAtSeat(next, 1)!.holeCards.length).toBe(2);
     expect(getPlayerAtSeat(next, 0)!.holeCards.length).toBe(2);
+  });
+
+  it('rejects rebuy when maxRebuysPerPlayer is 0', () => {
+    const roomService = RoomService.forTest();
+    const tableService = new TableService();
+    const game = GameService.forTest({ roomService, tableService });
+    const created = roomService.createRoom({
+      settings: { maxSeats: 6, maxRebuysPerPlayer: 0 },
+    });
+    const roomId = created.roomId;
+    for (let i = 0; i < 2; i++) {
+      const sid = `sock-d-${i}`;
+      roomService.registerNickname(sid, {
+        nickname: `P_${i}`,
+        clientSessionId: `sess-d-${i}`,
+      });
+      roomService.joinRoom(sid, {
+        roomId,
+        clientSessionId: `sess-d-${i}`,
+      });
+    }
+    const bustedId = roomService.getRoom(roomId)!.players[0]!.playerId;
+    tableService.setTableState(
+      roomId,
+      Object.freeze({
+        ...tableService.createTableForRoom(roomService.getRoom(roomId)!),
+        playersById: Object.freeze({
+          [bustedId]: Object.freeze({
+            playerId: bustedId,
+            seatIndex: 0,
+            chips: 0,
+            holeCards: Object.freeze([]),
+            currentBet: 0,
+            totalCommitted: 0,
+            hasFolded: false,
+            isAllIn: false,
+            isSittingOut: true,
+          }),
+          [roomService.getRoom(roomId)!.players[1]!.playerId]: Object.freeze({
+            playerId: roomService.getRoom(roomId)!.players[1]!.playerId,
+            seatIndex: 1,
+            chips: DEFAULT_STARTING_CHIPS,
+            holeCards: Object.freeze([]),
+            currentBet: 0,
+            totalCommitted: 0,
+            hasFolded: false,
+            isAllIn: false,
+            isSittingOut: false,
+          }),
+        }),
+      }),
+    );
+
+    expect(() => game.rebuy(roomId, 0)).toThrow(GameOrchestrationError);
+  });
+
+  it('enforces maxRebuysPerPlayer limit', () => {
+    const roomService = RoomService.forTest();
+    const tableService = new TableService();
+    const game = GameService.forTest({ roomService, tableService });
+    const created = roomService.createRoom({
+      settings: {
+        maxSeats: 6,
+        maxRebuysPerPlayer: 1,
+        rebuyAmount: 150,
+      },
+    });
+    const roomId = created.roomId;
+    for (let i = 0; i < 2; i++) {
+      const sid = `sock-l-${i}`;
+      roomService.registerNickname(sid, {
+        nickname: `L_${i}`,
+        clientSessionId: `sess-l-${i}`,
+      });
+      roomService.joinRoom(sid, {
+        roomId,
+        clientSessionId: `sess-l-${i}`,
+      });
+    }
+    const bustedId = roomService.getRoom(roomId)!.players[1]!.playerId;
+
+    const bust = (chips: number) => {
+      tableService.setTableState(
+        roomId,
+        Object.freeze({
+          ...tableService.createTableForRoom(roomService.getRoom(roomId)!),
+          hand: null,
+          playersById: Object.freeze({
+            [roomService.getRoom(roomId)!.players[0]!.playerId]: Object.freeze({
+              playerId: roomService.getRoom(roomId)!.players[0]!.playerId,
+              seatIndex: 0,
+              chips: DEFAULT_STARTING_CHIPS,
+              holeCards: Object.freeze([]),
+              currentBet: 0,
+              totalCommitted: 0,
+              hasFolded: false,
+              isAllIn: false,
+              isSittingOut: false,
+            }),
+            [bustedId]: Object.freeze({
+              playerId: bustedId,
+              seatIndex: 1,
+              chips,
+              holeCards: Object.freeze([]),
+              currentBet: 0,
+              totalCommitted: 0,
+              hasFolded: false,
+              isAllIn: false,
+              isSittingOut: chips <= 0,
+            }),
+          }),
+        }),
+      );
+    };
+
+    bust(0);
+    const first = game.rebuy(roomId, 1);
+    expect(first.playersById[bustedId]!.chips).toBe(150);
+    expect(roomService.getRoom(roomId)!.players[1]!.rebuyCount).toBe(1);
+
+    bust(0);
+    expect(() => game.rebuy(roomId, 1)).toThrow(GameOrchestrationError);
   });
 
   it('does not auto-start a hand after rebuy', () => {

@@ -1,11 +1,13 @@
-import type {
-  NextHandReadyStatePayload,
-  PlayerGameState,
-  RoomStatePayload,
-  WireSeatView,
+import {
+  DEFAULT_ROOM_SETTINGS,
+  type NextHandReadyStatePayload,
+  type PlayerGameState,
+  type RoomStatePayload,
+  type WireSeatView,
 } from '@neonpoker/shared';
 
 import { LAYOUTS, type SeatCount } from './layout';
+import { gameInfoFromRoomSettings } from './roomSettingsForm';
 import type {
   ActionBarMock,
   BoardReveal,
@@ -130,15 +132,36 @@ export function canViewerRebuy(opts: {
   readonly roomId: string | null;
   readonly handInProgress: boolean;
   readonly viewerStack: number | null;
+  readonly serverCanRebuy?: boolean;
 }): boolean {
-  return (
-    opts.isLiveRoom &&
-    opts.connectionStatus === 'connected' &&
-    opts.roomId != null &&
-    !opts.handInProgress &&
-    opts.viewerStack != null &&
-    opts.viewerStack <= 0
-  );
+  if (
+    !opts.isLiveRoom ||
+    opts.connectionStatus !== 'connected' ||
+    opts.roomId == null ||
+    opts.handInProgress
+  ) {
+    return false;
+  }
+  if (opts.serverCanRebuy != null) {
+    return opts.serverCanRebuy;
+  }
+  return opts.viewerStack != null && opts.viewerStack <= 0;
+}
+
+export function viewerRebuyAmount(
+  _gameState: PlayerGameState | null,
+  room: RoomStatePayload | null,
+): number {
+  return room?.settings.rebuyAmount ?? 200;
+}
+
+export function viewerRebuyDisabledReason(
+  gameState: PlayerGameState | null,
+): string | null {
+  if (gameState?.canRebuy === true) {
+    return null;
+  }
+  return gameState?.rebuyUnavailableReason ?? null;
 }
 
 /** Viewer seat from room roster when game state has not arrived yet. */
@@ -598,16 +621,17 @@ function idleActionBar(potAmount = 0): ActionBarMock {
 
 function baseLiveGameInfo(
   playerCount: number,
-  maxSeats: number,
+  settings: RoomStatePayload['settings'],
 ): TablePageMock['gameInfo'] {
-  return {
-    gameType: "No Limit Hold'em",
-    stakes: 'MVP',
-    buyIn: '—',
-    playerCount,
-    maxSeats,
-    nextBreak: '—',
-  };
+  return gameInfoFromRoomSettings(settings, playerCount);
+}
+
+function parseActionDeadline(iso: string | null | undefined): number | null {
+  if (iso == null) {
+    return null;
+  }
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /** Empty table shell while live room connects (no demo mock). */
@@ -621,7 +645,7 @@ export function createWaitingLiveTableView(): AdaptedTableView {
     heroHoleCards: null,
     handHistory: [],
     chatMessages: [],
-    gameInfo: baseLiveGameInfo(0, 9),
+    gameInfo: baseLiveGameInfo(0, DEFAULT_ROOM_SETTINGS),
     actionBar: idleActionBar(),
     layout: [],
     playersBySeatIndex: [],
@@ -678,7 +702,7 @@ export function adaptRoomLobbyState(
     heroHoleCards: null,
     handHistory: [],
     chatMessages: [],
-    gameInfo: baseLiveGameInfo(occupiedCount, room.maxSeats),
+    gameInfo: baseLiveGameInfo(occupiedCount, room.settings),
     actionBar: idleActionBar(),
     layout,
     playersBySeatIndex,
@@ -746,23 +770,31 @@ export function adaptPlayerGameState(
     };
   });
 
+  const actionDeadlineAt = parseActionDeadline(state.actionDeadlineAt);
+  const actionTimeoutSeconds = state.actionTimeoutSeconds;
+
   const seatStatesBySeatIndex: SeatStateMock[] = ordered.map((seat, layoutIdx) => {
     const revealed =
       layoutIdx !== 0 && seat.holeCards != null && seat.holeCards.length >= 2
         ? [seat.holeCards[0]!, seat.holeCards[1]!]
         : null;
+    const status = resolveSeatStatus(
+      seat,
+      state.activeSeatIndex,
+      state.handComplete,
+      true,
+      state.winnerSeatIndexes,
+    );
+    const isTurn =
+      status === 'turn' && seat.seatIndex === state.activeSeatIndex;
     return {
-      status: resolveSeatStatus(
-        seat,
-        state.activeSeatIndex,
-        state.handComplete,
-        true,
-        state.winnerSeatIndexes,
-      ),
+      status,
       bet: seatLabelBet(seat),
       amount: seatLabelBet(seat) > 0 ? seatLabelBet(seat) : '',
       showOppBackcards: shouldShowOppBackcards(seat, layoutIdx),
       oppHoleCards: revealed,
+      actionDeadlineAt: isTurn ? actionDeadlineAt : undefined,
+      actionTimeoutSeconds: isTurn ? actionTimeoutSeconds : undefined,
     };
   });
 
@@ -801,7 +833,20 @@ export function adaptPlayerGameState(
     heroHoleCards,
     handHistory: [],
     chatMessages: [],
-    gameInfo: baseLiveGameInfo(occupiedCount, state.maxSeats),
+    gameInfo: baseLiveGameInfo(
+      occupiedCount,
+      room?.settings ?? {
+        ...DEFAULT_ROOM_SETTINGS,
+        maxSeats: (state.maxSeats === 2 ||
+        state.maxSeats === 4 ||
+        state.maxSeats === 6 ||
+        state.maxSeats === 9
+          ? state.maxSeats
+          : DEFAULT_ROOM_SETTINGS.maxSeats) as typeof DEFAULT_ROOM_SETTINGS.maxSeats,
+        actionTimeoutSeconds:
+          state.actionTimeoutSeconds ?? DEFAULT_ROOM_SETTINGS.actionTimeoutSeconds,
+      },
+    ),
     actionBar: buildActionBar(state, viewerServerSeatIndex),
     layout,
     playersBySeatIndex,

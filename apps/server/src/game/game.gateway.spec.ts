@@ -24,6 +24,7 @@ import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
 import { ChatService } from '../chat/chat.service';
+import { ActionTimerService } from './action-timer.service';
 import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameBroadcastService } from './game-broadcast';
 import { HandHistoryService } from './hand-history.service';
@@ -121,12 +122,19 @@ describe('Game gateway (Phase 6C2)', () => {
       handHistory,
       nextHandReady,
     );
+    const actionTimer = new ActionTimerService(
+      roomService,
+      gameService,
+      gameBroadcast,
+      handHistory,
+    );
     gateway = new RoomGateway(
       roomService,
       gameService,
       gameBroadcast,
       nextHandReady,
       new ChatService(),
+      actionTimer,
     );
     gateway.onModuleInit();
 
@@ -182,7 +190,7 @@ describe('Game gateway (Phase 6C2)', () => {
   }
 
   it('broadcasts per-viewer SERVER_GAME_STATE on start hand', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     const stateA = waitForEvent(a, SERVER_GAME_STATE);
@@ -224,7 +232,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('returns NOT_YOUR_TURN for out-of-turn action', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     const stateA = waitForEvent(a, SERVER_GAME_STATE);
@@ -247,7 +255,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('request game state returns only viewer hole cards', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     a.emit(CLIENT_START_HAND, { roomId: room.roomId });
@@ -266,7 +274,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('rejects unjoined socket for start hand', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const outsider = connectClient(port);
     await new Promise<void>((r) => outsider.once('connect', () => r()));
     outsider.emit(CLIENT_REGISTER_NICKNAME, {
@@ -295,7 +303,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('updates all sockets after action', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     const startA = waitForEvent(a, SERVER_GAME_STATE);
@@ -322,7 +330,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('keeps roster during disconnect grace without immediate hand reset', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     const startA = waitForEvent(a, SERVER_GAME_STATE);
@@ -350,7 +358,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('emits SERVER_HAND_RESULT when hand completes via fold', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
 
     const startA = waitForEvent(a, SERVER_GAME_STATE);
@@ -394,7 +402,7 @@ describe('Game gateway (Phase 6C2)', () => {
   });
 
   it('CLIENT_REBUY restores busted player and broadcasts SERVER_GAME_STATE', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const { a, b } = await seatTwo(room.roomId);
     const roomState = roomService.getRoom(room.roomId)!;
     const bustedId = roomState.players[1]!.playerId;

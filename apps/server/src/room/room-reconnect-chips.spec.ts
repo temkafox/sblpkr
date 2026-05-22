@@ -17,7 +17,7 @@ describe('Room reconnect preserves table stacks', () => {
     const tableService = new TableService();
     const gameService = GameService.forTest({ roomService, tableService });
 
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const clientSid = 'session-stack';
 
     roomService.registerNickname('sock-a', {

@@ -40,6 +40,8 @@ export interface GameInfoMock {
   gameType: string;
   stakes: string;
   buyIn: string;
+  rebuyLine?: string;
+  turnTimer?: string;
   playerCount: number;
   maxSeats: number;
   nextBreak: string;
@@ -83,6 +85,9 @@ export interface SeatStateMock {
   showOppBackcards?: boolean;
   /** Face-up opponent hole cards after showdown (layout seat only). */
   oppHoleCards?: readonly CardModel[] | null;
+  /** Server action deadline (ms epoch) — display-only countdown. */
+  actionDeadlineAt?: number | null;
+  actionTimeoutSeconds?: number;
 }
 
 export type PlayerRing = 'cyan' | 'pink' | 'magenta' | 'violet' | 'green' | 'amber';

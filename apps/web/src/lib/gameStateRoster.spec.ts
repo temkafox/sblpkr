@@ -6,16 +6,14 @@ import {
   shouldAcceptGameStatePayload,
   shouldClearGameStateForRoom,
 } from './gameStateRoster';
+import { mockRoomState } from '../test/roomFixtures';
 
-const room: RoomStatePayload = {
+const room: RoomStatePayload = mockRoomState({
   roomId: 'room-1',
-  code: 'ABC123',
-  maxSeats: 9,
-  status: 'waiting',
   players: [
     { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
   ],
-};
+});
 
 const activeHand: PlayerGameState = {
   tableId: 'room-1',

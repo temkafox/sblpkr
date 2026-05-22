@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ROOM_CODE_PATTERN } from '@neonpoker/shared';
+import { DEFAULT_ROOM_SETTINGS, ROOM_CODE_PATTERN } from '@neonpoker/shared';
 
 import { RoomService } from './room.service';
 
@@ -41,7 +41,7 @@ describe('RoomService', () => {
     });
 
     for (const maxSeats of [2, 4, 6, 9] as const) {
-      const room = svc.createRoom({ maxSeats });
+      const room = svc.createRoom({ settings: { maxSeats } });
       expect(room.maxSeats).toBe(maxSeats);
     }
   });
@@ -52,7 +52,7 @@ describe('RoomService', () => {
       id: () => '44444444-4444-4444-8444-444444444444',
     });
 
-    const created = svc.createRoom({ maxSeats: 6 });
+    const created = svc.createRoom({ settings: { maxSeats: 6 } });
 
     expect(svc.getRoom(created.roomId)?.maxSeats).toBe(6);
     expect(svc.getRoom('joinme')?.roomId).toBe(created.roomId);
@@ -97,6 +97,41 @@ describe('RoomService', () => {
 
     expect(a.roomId).not.toBe(b.roomId);
     expect(a.code).not.toBe(b.code);
+  });
+
+  it('stores merged settings on create', () => {
+    const svc = RoomService.forTest({
+      code: () => 'SETTNG',
+      id: () => '88888888-8888-4888-8888-888888888888',
+    });
+
+    const created = svc.createRoom({
+      settings: {
+        startingStack: 500,
+        smallBlind: 5,
+        bigBlind: 10,
+        rebuyAmount: 500,
+        maxRebuysPerPlayer: 1,
+        actionTimeoutSeconds: 10,
+      },
+    });
+
+    const room = svc.getRoom(created.roomId)!;
+    expect(room.settings.startingStack).toBe(500);
+    expect(room.settings.smallBlind).toBe(5);
+    expect(room.settings.bigBlind).toBe(10);
+    expect(room.settings.maxRebuysPerPlayer).toBe(1);
+    expect(room.settings.actionTimeoutSeconds).toBe(10);
+    expect(created.settings.startingStack).toBe(500);
+  });
+
+  it('defaults settings when create payload omitted', () => {
+    const svc = RoomService.forTest({
+      code: () => 'DEFSET',
+      id: () => '99999999-9999-4999-8999-999999999999',
+    });
+    const created = svc.createRoom();
+    expect(created.settings).toEqual(DEFAULT_ROOM_SETTINGS);
   });
 
   it('deleteRoom removes room from lookup', () => {

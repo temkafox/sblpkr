@@ -15,6 +15,7 @@ import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
 import { ChatService } from '../chat/chat.service';
+import { ActionTimerService } from '../game/action-timer.service';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { HandHistoryService } from '../game/hand-history.service';
 import { NextHandReadyService } from '../game/next-hand-ready.service';
@@ -118,12 +119,19 @@ describe('RoomGateway chat (Socket.IO)', () => {
       handHistory,
       nextHandReady,
     );
+    const actionTimer = new ActionTimerService(
+      roomService,
+      gameService,
+      gameBroadcast,
+      handHistory,
+    );
     gateway = new RoomGateway(
       roomService,
       gameService,
       gameBroadcast,
       nextHandReady,
       chatService,
+      actionTimer,
     );
     gateway.onModuleInit();
     httpServer = createServer();

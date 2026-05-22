@@ -12,7 +12,6 @@ import { randomUUID } from 'node:crypto';
 import { RoomService } from '../room/room.service';
 import { TableService } from '../table/table.service';
 import { toCorePlayerAction } from './action-mapper';
-import { DEFAULT_REBUY_CHIPS } from './game.constants';
 import { GameOrchestrationError } from './game.errors';
 import { progressGameState } from './game-progress';
 import { HandHistoryService } from './hand-history.service';
@@ -163,6 +162,21 @@ export class GameService {
       );
     }
 
+    const maxRebuys = room.settings.maxRebuysPerPlayer;
+    if (maxRebuys === 0) {
+      throw new GameOrchestrationError(
+        'REBUY_DISABLED',
+        'Rebuys are disabled in this room',
+      );
+    }
+    if (maxRebuys != null && seat.rebuyCount >= maxRebuys) {
+      throw new GameOrchestrationError(
+        'REBUY_LIMIT_REACHED',
+        'Rebuy limit reached for this player',
+      );
+    }
+
+    const rebuyAmount = room.settings.rebuyAmount;
     const handComplete = hand != null && hand.isComplete;
 
     const playersById: Record<string, (typeof state.playersById)[string]> =
@@ -174,12 +188,12 @@ export class GameService {
       handComplete
         ? {
             ...player,
-            chips: DEFAULT_REBUY_CHIPS,
+            chips: rebuyAmount,
             isSittingOut: false,
           }
         : {
             ...player,
-            chips: DEFAULT_REBUY_CHIPS,
+            chips: rebuyAmount,
             isSittingOut: false,
             holeCards: Object.freeze([]),
             currentBet: 0,
@@ -201,7 +215,8 @@ export class GameService {
       this.tableService.setTableState(roomId, next);
       this.tableService.clearHandResult(roomId);
     }
-    this.handHistory.onRebuy(room, seatIndex, DEFAULT_REBUY_CHIPS);
+    this.roomService.incrementRebuyCount(roomId, seat.playerId);
+    this.handHistory.onRebuy(room, seatIndex, rebuyAmount);
     return next;
   }
 
@@ -209,6 +224,7 @@ export class GameService {
     roomId: string,
     seatIndex: SeatIndex,
     action: PlayerActionIntent,
+    options?: { readonly fromTimeout?: boolean },
   ): CoreGameState {
     const coreAction = toCorePlayerAction(action);
     const room = this.requireRoom(roomId);
@@ -223,7 +239,9 @@ export class GameService {
 
     const before = state;
     state = applyAction(state, seatIndex, coreAction);
-    this.handHistory.onPlayerAction(room, state, seatIndex, action);
+    if (!options?.fromTimeout) {
+      this.handHistory.onPlayerAction(room, state, seatIndex, action);
+    }
     const progressed = progressGameState(state, room);
     state = progressed.state;
     this.handHistory.onProgress(

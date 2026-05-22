@@ -49,7 +49,7 @@ function seatRoom(
   playerCount: number,
   maxSeats: 2 | 4 | 6 | 9 = 6,
 ): string {
-  const room = roomService.createRoom({ maxSeats });
+  const room = roomService.createRoom({ settings: { maxSeats } });
   for (let i = 0; i < playerCount; i++) {
     const sid = `sock-${i}`;
     roomService.registerNickname(sid, {
@@ -130,9 +130,45 @@ function closeBettingOnStreet(
 }
 
 describe('GameService (Phase 6C1)', () => {
+  it('startHand uses configured blinds and starting stack', () => {
+    const roomService = RoomService.forTest();
+    const tableService = new TableService();
+    const game = GameService.forTest({ roomService, tableService });
+    const created = roomService.createRoom({
+      settings: {
+        maxSeats: 2,
+        startingStack: 500,
+        smallBlind: 5,
+        bigBlind: 10,
+        rebuyAmount: 500,
+      },
+    });
+    const roomId = created.roomId;
+    for (let i = 0; i < 2; i++) {
+      const sid = `sb-${i}`;
+      roomService.registerNickname(sid, {
+        nickname: `B_${i}`,
+        clientSessionId: `csb-${i}`,
+      });
+      roomService.joinRoom(sid, {
+        roomId,
+        clientSessionId: `csb-${i}`,
+      });
+    }
+    const state = game.startHand(roomId);
+    const sbSeat = state.table.smallBlindSeatIndex!;
+    const bbSeat = state.table.bigBlindSeatIndex!;
+    const sb = state.playersById[state.table.seats[sbSeat]!.playerId!]!;
+    const bb = state.playersById[state.table.seats[bbSeat]!.playerId!]!;
+    expect(sb.currentBet).toBe(5);
+    expect(bb.currentBet).toBe(10);
+    expect(sb.chips).toBe(500 - 5);
+    expect(bb.chips).toBe(500 - 10);
+  });
+
   it('syncs a later joiner with DEFAULT_STARTING_CHIPS before first hand', () => {
     const { roomService, game } = gameHarness('sync-joiner');
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
     const roomId = room.roomId;
 
     roomService.registerNickname('sock-0', {

@@ -1,15 +1,15 @@
 import type {
-  AllowedRoomMaxSeats,
   CreateRoomResponse,
   GetRoomResponse,
+  RoomSettingsPartial,
 } from '@neonpoker/shared';
 
 import { apiFetch } from './http';
 
 export async function createRoom(
-  maxSeats?: AllowedRoomMaxSeats,
+  settings?: RoomSettingsPartial,
 ): Promise<CreateRoomResponse> {
-  const body = maxSeats != null ? { maxSeats } : {};
+  const body = settings != null ? { settings } : {};
   return apiFetch<CreateRoomResponse>('/rooms', {
     method: 'POST',
     body: JSON.stringify(body),

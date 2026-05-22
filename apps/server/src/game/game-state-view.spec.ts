@@ -9,7 +9,11 @@ import {
   getAvailableActions,
   startHand,
 } from '@neonpoker/poker-core';
-import { PlayerGameStateSchema, PublicGameStateSchema } from '@neonpoker/shared';
+import {
+  DEFAULT_ROOM_SETTINGS,
+  PlayerGameStateSchema,
+  PublicGameStateSchema,
+} from '@neonpoker/shared';
 
 import type { MutableInternalRoom } from '../room/room.types';
 import {
@@ -29,6 +33,8 @@ function sampleRoom(): MutableInternalRoom {
     maxSeats: 6,
     status: 'waiting',
     hostPlayerId: 'p0',
+    settings: DEFAULT_ROOM_SETTINGS,
+    actionDeadlineAt: null,
     players: [
       {
         playerId: 'p0',
@@ -37,6 +43,7 @@ function sampleRoom(): MutableInternalRoom {
         clientSessionId: 'gv-p0',
         socketId: 'sock-0',
         connectionStatus: 'connected',
+        rebuyCount: 0,
       },
       {
         playerId: 'p1',
@@ -45,6 +52,7 @@ function sampleRoom(): MutableInternalRoom {
         clientSessionId: 'gv-p1',
         socketId: 'sock-1',
         connectionStatus: 'connected',
+        rebuyCount: 0,
       },
     ],
   };

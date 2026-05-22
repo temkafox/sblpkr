@@ -35,8 +35,10 @@ import {
   SOCKET_IO_PATH,
 } from '@neonpoker/shared';
 import type { SocketErrorCode } from '@neonpoker/shared';
+import type { CoreGameState } from '@neonpoker/poker-core';
 import type { Server, Socket } from 'socket.io';
 
+import { ActionTimerService } from '../game/action-timer.service';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { NextHandReadyService } from '../game/next-hand-ready.service';
 import { GameService } from '../game/game.service';
@@ -64,6 +66,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     private readonly gameBroadcast: GameBroadcastService,
     private readonly nextHandReady: NextHandReadyService,
     private readonly chatService: ChatService,
+    private readonly actionTimer: ActionTimerService,
   ) {}
 
   onModuleInit(): void {
@@ -159,6 +162,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
 
     try {
       const state = this.gameService.rebuy(roomId, seatIndex);
+      this.actionTimer.clearTimer(roomId);
       this.broadcastRoomState(roomId);
       if (state.hand?.isComplete) {
         this.gameBroadcast.emitGameStateToRoom(this.server, roomId, state);
@@ -312,7 +316,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
 
     try {
       const state = this.gameService.startHand(roomId);
-      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      this.publishGameUpdate(roomId, state);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
@@ -397,7 +401,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
         seatIndex,
         parsed.data.action,
       );
-      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      this.publishGameUpdate(roomId, state);
     } catch (err) {
       const mapped = mapToSocketErrorCode(err);
       this.emitError(client, mapped.code, mapped.message);
@@ -499,7 +503,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
 
     const state = this.gameService.reconcileAfterRosterChange(roomId);
     if (state != null) {
-      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      this.publishGameUpdate(roomId, state);
       this.syncNextHandReadyAfterEligibilityChange(roomId);
       return;
     }
@@ -529,10 +533,15 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     try {
       const state = this.gameService.startHand(roomId);
       this.gameBroadcast.clearNextHandReadyPhase(this.server, roomId);
-      this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+      this.publishGameUpdate(roomId, state);
     } catch {
       this.gameBroadcast.emitNextHandReadyToRoom(this.server, roomId);
     }
+  }
+
+  private publishGameUpdate(roomId: string, state: CoreGameState): void {
+    this.gameBroadcast.emitGameUpdateToRoom(this.server, roomId, state);
+    this.actionTimer.syncTimer(this.server, roomId);
   }
 
   /** Keeps idle lobby stacks aligned when roster grows before the first hand. */
@@ -545,6 +554,7 @@ export class RoomGateway implements OnGatewayDisconnect, OnModuleInit {
     try {
       const state = this.gameService.getGameState(roomId);
       if (state.hand == null) {
+        this.actionTimer.clearTimer(roomId);
         this.gameBroadcast.emitIdleGameStateToRoom(this.server, roomId, state);
       }
     } catch {

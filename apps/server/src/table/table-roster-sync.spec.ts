@@ -22,7 +22,7 @@ import {
 
 function roomWithPlayers(count: number): MutableInternalRoom {
   const roomService = RoomService.forTest();
-  const created = roomService.createRoom({ maxSeats: 6 });
+  const created = roomService.createRoom({ settings: { maxSeats: 6 } });
   for (let i = 0; i < count; i++) {
     const sid = `sock-${i}`;
     const nick = roomService.registerNickname(sid, {

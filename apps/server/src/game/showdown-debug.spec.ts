@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Card } from '@neonpoker/shared';
+import { DEFAULT_ROOM_SETTINGS } from '@neonpoker/shared';
 import {
   determineShowdownWinners,
   createInitialGameState,
@@ -142,6 +143,8 @@ describe('logShowdownResolution', () => {
       maxSeats: 6,
       status: 'playing',
       hostPlayerId: 'p0',
+      settings: DEFAULT_ROOM_SETTINGS,
+      actionDeadlineAt: null,
       players: [
         {
           playerId: 'p0',
@@ -150,6 +153,7 @@ describe('logShowdownResolution', () => {
           clientSessionId: 's0',
           socketId: 'sock-0',
           connectionStatus: 'connected',
+          rebuyCount: 0,
         },
         {
           playerId: 'p1',
@@ -158,6 +162,7 @@ describe('logShowdownResolution', () => {
           clientSessionId: 's1',
           socketId: 'sock-1',
           connectionStatus: 'connected',
+          rebuyCount: 0,
         },
       ],
     });

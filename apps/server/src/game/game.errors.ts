@@ -7,6 +7,8 @@ export type GameErrorCode =
   | 'NOT_JOINED'
   | 'NOT_BUSTED'
   | 'HAND_IN_PROGRESS'
+  | 'REBUY_DISABLED'
+  | 'REBUY_LIMIT_REACHED'
   | 'NEXT_HAND_NOT_WAITING'
   | 'NOT_ELIGIBLE_FOR_READY';
 

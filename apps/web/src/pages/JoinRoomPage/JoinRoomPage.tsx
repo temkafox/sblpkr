@@ -10,6 +10,13 @@ import {
   normalizeNickname,
   validateNickname,
 } from '../../lib/joinValidation';
+import {
+  CREATE_ROOM_SETTINGS_DEFAULTS,
+  formToPartial,
+  type CreateRoomSettingsFormState,
+  validateCreateRoomSettingsForm,
+} from '../../lib/roomSettingsForm';
+import { CreateRoomSettingsPanel } from './CreateRoomSettingsPanel';
 import { extractRoomCodeFromPaste } from '../../lib/roomCode';
 import {
   isValidRoomLookup,
@@ -33,6 +40,13 @@ export function JoinRoomPage() {
   const [roomTouched, setRoomTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [createSettings, setCreateSettings] =
+    useState<CreateRoomSettingsFormState>(CREATE_ROOM_SETTINGS_DEFAULTS);
+  const [settingsTouched, setSettingsTouched] = useState(false);
+  const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>(
+    {},
+  );
 
   useEffect(() => {
     if (savedNickname) {
@@ -118,13 +132,21 @@ export function JoinRoomPage() {
 
   const handleCreateRoom = async () => {
     setNicknameTouched(true);
+    setSettingsTouched(true);
     setPanelError(null);
 
     if (!nickValidation.ok) return;
 
+    const fieldErrors = validateCreateRoomSettingsForm(createSettings);
+    setSettingsErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      setSettingsExpanded(true);
+      return;
+    }
+
     setBusy(true);
     try {
-      const created = await createRoom();
+      const created = await createRoom(formToPartial(createSettings));
       const lookup = created?.roomId?.trim();
       if (!lookup) {
         console.error('[neonpoker] createRoom missing roomId', created);
@@ -208,6 +230,22 @@ export function JoinRoomPage() {
               </span>
             ) : null}
           </label>
+
+          {!inviteLocked ? (
+            <CreateRoomSettingsPanel
+              expanded={settingsExpanded}
+              onToggle={() => setSettingsExpanded((v) => !v)}
+              form={createSettings}
+              onChange={(next) => {
+                setCreateSettings(next);
+                if (settingsTouched) {
+                  setSettingsErrors(validateCreateRoomSettingsForm(next));
+                }
+              }}
+              errors={settingsTouched ? settingsErrors : {}}
+              disabled={busy}
+            />
+          ) : null}
 
           <div className="jr-actions">
             <button

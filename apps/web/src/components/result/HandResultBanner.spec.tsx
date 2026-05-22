@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { HandResultPayload, RoomStatePayload } from '@neonpoker/shared';
 
+import { mockRoomState } from '../../test/roomFixtures';
 import { HandResultBanner } from './HandResultBanner';
 
 describe('HandResultBanner', () => {
@@ -9,16 +10,14 @@ describe('HandResultBanner', () => {
     cleanup();
   });
 
-  const room: RoomStatePayload = {
+  const room: RoomStatePayload = mockRoomState({
     roomId: 'room-1',
     code: 'ABC',
-    maxSeats: 9,
-    status: 'waiting',
     players: [
       { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
       { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
     ],
-  };
+  });
 
   it('renders winner nickname and awarded amount', () => {
     const result: HandResultPayload = {

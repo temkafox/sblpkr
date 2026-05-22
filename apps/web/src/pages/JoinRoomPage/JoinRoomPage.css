@@ -220,3 +220,62 @@
     0 0 28px rgba(139, 92, 255, 0.55),
     0 12px 28px rgba(0, 0, 0, 0.58);
 }
+
+.jr-settings {
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid rgba(139, 92, 255, 0.2);
+}
+
+.jr-settings__toggle {
+  width: 100%;
+  padding: var(--s-3) var(--s-4);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+  background: rgba(139, 92, 255, 0.12);
+  border: 1px solid rgba(139, 92, 255, 0.35);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.jr-settings__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+
+.jr-settings__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+
+.jr-settings__rebuys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.jr-field--compact .jr-field__label {
+  font-size: 0.72rem;
+}
+
+.jr-field--inline {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+
+.jr-field--inline input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+}
+
+.jr-settings__reset {
+  align-self: flex-start;
+  margin-top: var(--s-2);
+}

@@ -100,11 +100,17 @@ export const PublicGameStateSchema = z.object({
   showdownReady: z.boolean(),
   handEndKind: handEndKindSchema.nullable().optional(),
   winnerSeatIndexes: z.array(z.number().int().nonnegative()).optional(),
+  actionDeadlineAt: z.string().nullable().optional(),
+  actionTimeoutSeconds: z.number().int().positive().optional(),
 });
 
 export const PlayerGameStateSchema = PublicGameStateSchema.extend({
   viewerSeatIndex: z.number().int().nonnegative(),
   availableActions: availableActionsSchema.optional(),
+  rebuyCount: z.number().int().nonnegative().optional(),
+  maxRebuysPerPlayer: z.number().int().nonnegative().nullable().optional(),
+  canRebuy: z.boolean().optional(),
+  rebuyUnavailableReason: z.string().optional(),
 });
 
 export const HandResultPotSchema = z.object({

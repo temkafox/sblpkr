@@ -2,17 +2,17 @@ import { z } from 'zod';
 
 import { PROTOCOL_VERSION } from '../protocol';
 import type { RoomStatus } from '../types/room';
+import {
+  MaxSeatsSchema,
+  RoomSettingsSchema,
+  type RoomSettings,
+} from './room-settings.dto';
 
 /** Allowed table sizes for MVP room creation (REST Phase 6A). */
 
 export const ALLOWED_ROOM_MAX_SEATS = [2, 4, 6, 9] as const;
 
-export const MaxSeatsSchema = z.union([
-  z.literal(2),
-  z.literal(4),
-  z.literal(6),
-  z.literal(9),
-]);
+export { MaxSeatsSchema };
 
 export type AllowedRoomMaxSeats = z.infer<typeof MaxSeatsSchema>;
 
@@ -32,8 +32,28 @@ export const RoomIdSchema = z.string().uuid();
 
 export const RoomIdOrCodeParamSchema = z.union([RoomIdSchema, RoomCodeSchema]);
 
+export { RoomSettingsSchema, type RoomSettings } from './room-settings.dto';
+export {
+  DEFAULT_ROOM_SETTINGS,
+  mergeRoomSettings,
+} from './room-settings.dto';
+
 export const CreateRoomRequestSchema = z.object({
-  maxSeats: MaxSeatsSchema.optional(),
+  settings: z
+    .object({
+      roomName: z.string().trim().max(32).optional(),
+      maxSeats: MaxSeatsSchema.optional(),
+      startingStack: z.number().int().positive().optional(),
+      smallBlind: z.number().int().min(1).optional(),
+      bigBlind: z.number().int().min(1).optional(),
+      rebuyAmount: z.number().int().positive().optional(),
+      maxRebuysPerPlayer: z.number().int().nonnegative().nullable().optional(),
+      actionTimeoutSeconds: z.number().int().min(5).max(120).optional(),
+      disconnectGraceSeconds: z.number().int().min(5).max(120).optional(),
+      allowSpectators: z.boolean().optional(),
+      chatEnabled: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
@@ -45,6 +65,7 @@ export type CreateRoomResponse = {
   readonly status: RoomStatus;
   readonly seatedCount: number;
   readonly createdAt: string;
+  readonly settings: RoomSettings;
 };
 
 export type GetRoomResponse = {
@@ -54,6 +75,7 @@ export type GetRoomResponse = {
   readonly status: RoomStatus;
   readonly seatedCount: number;
   readonly capacityAvailable: boolean;
+  readonly settings: RoomSettings;
 };
 
 /** Matches Phase 1D nickname rules — duplicate enforcement stays server-side. */
@@ -115,6 +137,7 @@ export const RoomStateSchema = z.object({
   maxSeats: z.number().int().positive(),
   players: z.array(RoomPlayerSchema),
   status: z.enum(['waiting', 'playing', 'closed']),
+  settings: RoomSettingsSchema,
 });
 
 export type RoomStatePayload = z.infer<typeof RoomStateSchema>;

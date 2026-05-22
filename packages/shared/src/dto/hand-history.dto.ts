@@ -43,6 +43,8 @@ export const HandHistoryActionKindSchema = z.enum([
   'hand_complete',
   'winner',
   'rebuy',
+  'timeout_check',
+  'timeout_fold',
 ]);
 
 /** One public hand-history line (no hole cards / deck). */

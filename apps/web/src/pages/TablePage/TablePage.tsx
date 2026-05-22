@@ -16,6 +16,8 @@ import {
   canViewerMarkNextHandReady,
   canViewerRebuy,
   canViewerStartHand,
+  viewerRebuyAmount,
+  viewerRebuyDisabledReason,
   countEligibleForNextHand,
   createWaitingLiveTableView,
   isNextHandReadyPhase,
@@ -201,7 +203,10 @@ export function TablePage() {
     roomId: roomId ?? null,
     handInProgress,
     viewerStack,
+    serverCanRebuy: gameState?.canRebuy,
   });
+  const rebuyLimitReason = viewerRebuyDisabledReason(gameState);
+  const rebuyAmount = viewerRebuyAmount(gameState, roomState);
 
   const waitingForPlayers =
     isLiveRoom && !hasActiveHand && playerCount < minPlayersToStart;
@@ -214,8 +219,6 @@ export function TablePage() {
     !enoughChipsForHand &&
     viewerStack != null &&
     viewerStack > 0;
-
-  const rebuyAmount = 200;
 
   const handleStartHand = useCallback(() => {
     if (!roomId || !canStartHand) return;
@@ -295,7 +298,12 @@ export function TablePage() {
   const rebuyErrorLabel =
     !handInProgress && gameError != null && gameError.length > 0
       ? gameError
-      : null;
+      : rebuyLimitReason != null &&
+          !canRebuy &&
+          viewerStack != null &&
+          viewerStack <= 0
+        ? rebuyLimitReason
+        : null;
 
   const roomMeta =
     roomState != null

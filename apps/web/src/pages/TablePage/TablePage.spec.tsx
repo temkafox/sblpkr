@@ -11,6 +11,7 @@ import { useGameStore } from '../../state/gameStore';
 import { useRoomStore } from '../../state/roomStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { chatRowsFromMessages } from '../../lib/chatAdapter';
+import { mockRoomState } from '../../test/roomFixtures';
 
 vi.mock('../../net/socket', () => ({
   requestGameState: vi.fn(),
@@ -27,32 +28,29 @@ vi.mock('../../net/socket', () => ({
 
 const roomId = '11111111-1111-4111-8111-111111111111';
 
-const soloRoom: RoomStatePayload = {
+const soloRoom: RoomStatePayload = mockRoomState({
   roomId,
-  code: 'ABC123',
-  maxSeats: 9,
-  status: 'waiting',
   players: [
     { playerId: 'a', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
   ],
-};
+});
 
-const duoRoom: RoomStatePayload = {
-  ...soloRoom,
+const duoRoom: RoomStatePayload = mockRoomState({
+  roomId,
   players: [
     { playerId: 'a', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
     { playerId: 'b', nickname: 'ASD', seatIndex: 1, connectionStatus: 'connected' },
   ],
-};
+});
 
-const trioRoom: RoomStatePayload = {
-  ...soloRoom,
+const trioRoom: RoomStatePayload = mockRoomState({
+  roomId,
   players: [
     { playerId: 'a', nickname: 'PlayerA', seatIndex: 0, connectionStatus: 'connected' },
     { playerId: 'b', nickname: 'PlayerB', seatIndex: 1, connectionStatus: 'connected' },
     { playerId: 'c', nickname: 'PlayerC', seatIndex: 2, connectionStatus: 'connected' },
   ],
-};
+});
 
 const idlePreHandState: PlayerGameState = {
   tableId: roomId,

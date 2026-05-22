@@ -6,6 +6,7 @@ import { JoinRoomPage } from './JoinRoomPage';
 import * as roomSession from '../../net/roomSession';
 import * as roomsApi from '../../net/roomsApi';
 import { useSessionStore } from '../../state/sessionStore';
+import { mockCreateRoomResponse, mockGetRoomResponse } from '../../test/roomFixtures';
 
 vi.mock('../../net/roomsApi', () => ({
   createRoom: vi.fn(),
@@ -42,33 +43,109 @@ describe('JoinRoomPage backend integration', () => {
     return router;
   }
 
-  it('Create Room calls createRoom then establishRoomSession', async () => {
+  it('create room settings panel sends settings payload', async () => {
     vi.mocked(roomsApi.createRoom).mockResolvedValue({
       roomId,
       code: 'ABC123',
-      maxSeats: 9,
+      maxSeats: 6,
       status: 'waiting',
       seatedCount: 0,
       createdAt: '2026-01-01T00:00:00.000Z',
+      settings: {
+        roomName: 'Neon Table',
+        maxSeats: 6,
+        startingStack: 500,
+        smallBlind: 5,
+        bigBlind: 10,
+        rebuyAmount: 500,
+        maxRebuysPerPlayer: 1,
+        actionTimeoutSeconds: 10,
+        disconnectGraceSeconds: 30,
+        allowSpectators: false,
+        chatEnabled: true,
+      },
     });
     vi.mocked(roomSession.establishRoomSession).mockResolvedValue({
       room: {
         roomId,
         code: 'ABC123',
-        maxSeats: 9,
+        maxSeats: 6,
         status: 'waiting',
         seatedCount: 0,
         capacityAvailable: true,
+        settings: {
+          roomName: 'Neon Table',
+          maxSeats: 6,
+          startingStack: 500,
+          smallBlind: 5,
+          bigBlind: 10,
+          rebuyAmount: 500,
+          maxRebuysPerPlayer: 1,
+          actionTimeoutSeconds: 10,
+          disconnectGraceSeconds: 30,
+          allowSpectators: false,
+          chatEnabled: true,
+        },
       },
+      roomId,
+    });
+
+    renderJoin();
+
+    fireEvent.change(screen.getAllByLabelText(/^nickname$/i)[0]!, {
+      target: { value: 'alice' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /create room settings/i }),
+    );
+    fireEvent.change(screen.getByLabelText(/starting stack/i), {
+      target: { value: '500' },
+    });
+    fireEvent.change(screen.getByLabelText(/small blind/i), {
+      target: { value: '5' },
+    });
+    fireEvent.change(screen.getByLabelText(/big blind/i), {
+      target: { value: '10' },
+    });
+    fireEvent.change(screen.getByLabelText(/max players/i), {
+      target: { value: '6' },
+    });
+    fireEvent.click(screen.getByLabelText(/unlimited rebuys/i));
+    fireEvent.change(screen.getByLabelText(/max rebuys per player/i), {
+      target: { value: '1' },
+    });
+    fireEvent.change(screen.getByLabelText(/turn time/i), {
+      target: { value: '10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
+
+    await waitFor(() => {
+      expect(roomsApi.createRoom).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startingStack: 500,
+          smallBlind: 5,
+          bigBlind: 10,
+          maxSeats: 6,
+          maxRebuysPerPlayer: 1,
+          actionTimeoutSeconds: 10,
+        }),
+      );
+    });
+  });
+
+  it('Create Room calls createRoom then establishRoomSession', async () => {
+    vi.mocked(roomsApi.createRoom).mockResolvedValue(mockCreateRoomResponse({ roomId }));
+    vi.mocked(roomSession.establishRoomSession).mockResolvedValue({
+      room: mockGetRoomResponse({ roomId }),
       roomId,
     });
 
     const router = renderJoin();
 
-    fireEvent.change(screen.getByLabelText(/nickname/i), {
+    fireEvent.change(screen.getAllByLabelText(/^nickname$/i)[0]!, {
       target: { value: 'alice' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /create room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
 
     await waitFor(() => {
       expect(roomsApi.createRoom).toHaveBeenCalled();
@@ -82,20 +159,13 @@ describe('JoinRoomPage backend integration', () => {
 
   it('Join Room calls establishRoomSession with room lookup', async () => {
     vi.mocked(roomSession.establishRoomSession).mockResolvedValue({
-      room: {
-        roomId,
-        code: 'ABC123',
-        maxSeats: 9,
-        status: 'waiting',
-        seatedCount: 1,
-        capacityAvailable: true,
-      },
+      room: mockGetRoomResponse({ roomId, seatedCount: 1 }),
       roomId,
     });
 
     const router = renderJoin();
 
-    fireEvent.change(screen.getByLabelText(/nickname/i), {
+    fireEvent.change(screen.getAllByLabelText(/^nickname$/i)[0]!, {
       target: { value: 'bob' },
     });
     fireEvent.change(screen.getByLabelText(/room code/i), {
@@ -120,7 +190,7 @@ describe('JoinRoomPage backend integration', () => {
 
     renderJoin();
 
-    fireEvent.change(screen.getByLabelText(/nickname/i), {
+    fireEvent.change(screen.getAllByLabelText(/^nickname$/i)[0]!, {
       target: { value: 'neo' },
     });
     fireEvent.change(screen.getByLabelText(/room code/i), {

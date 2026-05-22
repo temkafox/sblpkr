@@ -204,6 +204,71 @@ function buildSeatViews(
     });
 }
 
+function rebuyMetaForViewer(
+  room: MutableInternalRoom | null,
+  state: CoreGameState,
+  viewerSeatIndex: SeatIndex,
+): {
+  rebuyCount: number;
+  maxRebuysPerPlayer: number | null;
+  canRebuy: boolean;
+  rebuyUnavailableReason?: string;
+} | null {
+  if (room == null) {
+    return null;
+  }
+  const member = room.players[viewerSeatIndex];
+  if (member == null) {
+    return null;
+  }
+
+  const maxRebuys = room.settings.maxRebuysPerPlayer;
+  const rebuyCount = member.rebuyCount;
+  const playerId = state.table.seats[viewerSeatIndex]?.playerId;
+  const runtime =
+    playerId != null ? state.playersById[playerId] : undefined;
+  const hand = state.hand;
+
+  if (maxRebuys === 0) {
+    return {
+      rebuyCount,
+      maxRebuysPerPlayer: 0,
+      canRebuy: false,
+      rebuyUnavailableReason: 'Rebuys disabled',
+    };
+  }
+  if (maxRebuys != null && rebuyCount >= maxRebuys) {
+    return {
+      rebuyCount,
+      maxRebuysPerPlayer: maxRebuys,
+      canRebuy: false,
+      rebuyUnavailableReason: 'Rebuy limit reached',
+    };
+  }
+  if (hand != null && !hand.isComplete) {
+    return {
+      rebuyCount,
+      maxRebuysPerPlayer: maxRebuys,
+      canRebuy: false,
+      rebuyUnavailableReason: 'Hand in progress',
+    };
+  }
+  if (runtime != null && runtime.chips > 0) {
+    return {
+      rebuyCount,
+      maxRebuysPerPlayer: maxRebuys,
+      canRebuy: false,
+      rebuyUnavailableReason: 'Still has chips',
+    };
+  }
+
+  return {
+    rebuyCount,
+    maxRebuysPerPlayer: maxRebuys,
+    canRebuy: true,
+  };
+}
+
 function baseView(
   state: CoreGameState,
   room: MutableInternalRoom | null,
@@ -229,6 +294,11 @@ function baseView(
     showdownReady: hand?.showdownReady ?? false,
     handEndKind: handEndKindForState(state),
     winnerSeatIndexes: hand?.isComplete ? [...winners] : undefined,
+    actionDeadlineAt:
+      room?.actionDeadlineAt != null
+        ? new Date(room.actionDeadlineAt).toISOString()
+        : null,
+    actionTimeoutSeconds: room?.settings.actionTimeoutSeconds,
   };
 }
 
@@ -264,10 +334,13 @@ export function toPlayerGameState(
     availableActions = Object.freeze({ ...core });
   }
 
+  const rebuyMeta = rebuyMetaForViewer(room, state, viewerSeatIndex);
+
   return {
     ...base,
     viewerSeatIndex,
     ...(availableActions != null ? { availableActions: { ...availableActions } } : {}),
+    ...(rebuyMeta != null ? rebuyMeta : {}),
   };
 }
 

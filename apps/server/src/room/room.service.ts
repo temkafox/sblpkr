@@ -10,8 +10,10 @@ import type {
 import {
   JoinRoomPayloadSchema,
   LeaveRoomPayloadSchema,
+  mergeRoomSettings,
   RegisterNicknamePayloadSchema,
 } from '@neonpoker/shared';
+import type { RoomSettingsPartial } from '@neonpoker/shared';
 import { randomUUID } from 'node:crypto';
 
 import type {
@@ -26,10 +28,8 @@ import type {
   SocketSession,
 } from './room.types';
 
-const DEFAULT_MAX_SEATS = 9 as const;
-
-/** Grace period before a refresh disconnect is treated as a leave. */
-export const DISCONNECT_GRACE_MS = 60_000;
+/** Default grace when room record is missing (tests only). */
+export const DISCONNECT_GRACE_MS = 30_000;
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -80,7 +80,10 @@ export class RoomService {
   }
 
   createRoom(options: CreateRoomOptions = {}): CreateRoomResponse {
-    const maxSeats = options.maxSeats ?? DEFAULT_MAX_SEATS;
+    const settings = mergeRoomSettings(
+      options.settings as RoomSettingsPartial | undefined,
+    );
+    const maxSeats = settings.maxSeats;
 
     let roomId = '';
     let code = '';
@@ -102,6 +105,8 @@ export class RoomService {
       status: 'waiting',
       players: [],
       hostPlayerId: null,
+      settings,
+      actionDeadlineAt: null,
     };
 
     this.byId.set(roomId, record);
@@ -282,6 +287,7 @@ export class RoomService {
       clientSessionId,
       socketId,
       connectionStatus: 'connected',
+      rebuyCount: 0,
     };
 
     room.players.push(seated);
@@ -395,6 +401,28 @@ export class RoomService {
     return `${roomId}:${clientSessionId}`;
   }
 
+  setActionDeadline(roomId: string, deadlineAt: number | null): void {
+    const room = this.byId.get(roomId);
+    if (room == null) {
+      return;
+    }
+    room.actionDeadlineAt = deadlineAt;
+  }
+
+  getRebuyCount(roomId: string, playerId: string): number {
+    const room = this.byId.get(roomId);
+    const member = room?.players.find((p) => p.playerId === playerId);
+    return member?.rebuyCount ?? 0;
+  }
+
+  incrementRebuyCount(roomId: string, playerId: string): void {
+    const room = this.byId.get(roomId);
+    const member = room?.players.find((p) => p.playerId === playerId);
+    if (member != null) {
+      member.rebuyCount += 1;
+    }
+  }
+
   private scheduleDisconnectGrace(
     roomId: string,
     clientSessionId: string,
@@ -405,10 +433,16 @@ export class RoomService {
       clearTimeout(prior);
     }
 
+    const room = this.byId.get(roomId);
+    const graceMs =
+      room != null
+        ? room.settings.disconnectGraceSeconds * 1000
+        : this.gracePeriodMs;
+
     const timer = setTimeout(() => {
       this.disconnectTimers.delete(key);
       this.finalizeDisconnect(roomId, clientSessionId);
-    }, this.gracePeriodMs);
+    }, graceMs);
 
     this.disconnectTimers.set(key, timer);
   }
@@ -496,6 +530,7 @@ export class RoomService {
       code: room.code,
       maxSeats: room.maxSeats,
       status: room.status,
+      settings: room.settings,
       players: Object.freeze(
         room.players.map((p) =>
           Object.freeze({
@@ -517,6 +552,7 @@ export class RoomService {
       status: room.status,
       seatedCount: room.players.length,
       createdAt: room.createdAt.toISOString(),
+      settings: room.settings,
     });
   }
 
@@ -529,6 +565,7 @@ export class RoomService {
       status: room.status,
       seatedCount,
       capacityAvailable: seatedCount < room.maxSeats,
+      settings: room.settings,
     });
   }
 }

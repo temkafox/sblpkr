@@ -5,17 +5,16 @@ import {
   buildHandResultWinnerLines,
   handResultHeadline,
 } from './handResultView';
+import { mockRoomState } from '../test/roomFixtures';
 
-const room: RoomStatePayload = {
+const room: RoomStatePayload = mockRoomState({
   roomId: 'room-1',
   code: 'ABC',
-  maxSeats: 9,
-  status: 'waiting',
   players: [
     { playerId: 'a', nickname: 'Alice', seatIndex: 0, connectionStatus: 'connected' },
     { playerId: 'b', nickname: 'Bob', seatIndex: 1, connectionStatus: 'connected' },
   ],
-};
+});
 
 describe('handResultView', () => {
   it('builds winner lines with nicknames and integer awards', () => {

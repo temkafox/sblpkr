@@ -2,6 +2,7 @@ import './Seats.css';
 
 import { HeroHoleCards } from '../cards/HeroHoleCards';
 import { Avatar } from './Avatar';
+import { actionTimerBarStyle } from '../../lib/actionTimerDisplay';
 import { formatChips } from '../../lib/formatChips';
 import { seatStatusLabel } from '../../lib/seatStatusLabel';
 import type { SeatPosition } from '../../lib/layout';
@@ -82,6 +83,7 @@ export function HeroSeat({
   const w = pos.w || 320;
   const h = pos.h || 110;
   const states = heroStateClass(st.status);
+  const timerBarStyle = actionTimerBarStyle(st.actionDeadlineAt);
 
   return (
     <div
@@ -106,7 +108,11 @@ export function HeroSeat({
           </button>
         ) : null}
         <div className="timer">
-          <div className="bar" key={`${player.id}-${st.status}`} />
+          <div
+            className="bar"
+            key={`${player.id}-${st.actionDeadlineAt ?? st.status}`}
+            style={timerBarStyle}
+          />
         </div>
       </div>
       <Avatar player={player} ring="cyan" />

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayerGameState, RoomStatePayload, WireSeatView } from '@neonpoker/shared';
 
+import { mockRoomState } from '../test/roomFixtures';
+
 import {
   adaptPlayerGameState,
   adaptRoomLobbyState,
@@ -98,16 +100,13 @@ function baseState(overrides: Partial<PlayerGameState> = {}): PlayerGameState {
   };
 }
 
-const roomRoster: RoomStatePayload = {
+const roomRoster: RoomStatePayload = mockRoomState({
   roomId: 'room-1',
-  code: 'ABC123',
-  maxSeats: 9,
-  status: 'waiting',
   players: [
     { playerId: 'p-hero', nickname: 'ljhh', seatIndex: 0, connectionStatus: 'connected' },
     { playerId: 'p-villain', nickname: 'ASD', seatIndex: 1, connectionStatus: 'connected' },
   ],
-};
+});
 
 describe('gameStateAdapter', () => {
   it('maps street to board reveal count', () => {
@@ -1016,17 +1015,15 @@ describe('gameStateAdapter', () => {
   });
 
   it('lobby layout rotates by server seatIndex not nickname sort', () => {
-    const room: RoomStatePayload = {
+    const room: RoomStatePayload = mockRoomState({
       roomId: 'room-1',
       code: 'ABC',
-      maxSeats: 9,
-      status: 'waiting',
       players: [
         { playerId: 'p0', nickname: 'ASD', seatIndex: 0, connectionStatus: 'connected' },
         { playerId: 'p1', nickname: '1234', seatIndex: 1, connectionStatus: 'connected' },
         { playerId: 'p2', nickname: '2d2d', seatIndex: 2, connectionStatus: 'connected' },
       ],
-    };
+    });
     const asViewer1 = adaptRoomLobbyState(room, '1234');
     expect(asViewer1.playersBySeatIndex.map((p) => p.name)).toEqual([
       '1234',

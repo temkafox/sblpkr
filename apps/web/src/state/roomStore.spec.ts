@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { mockRoomState } from '../test/roomFixtures';
 import { useRoomStore } from './roomStore';
 
 describe('roomStore', () => {
@@ -9,13 +10,7 @@ describe('roomStore', () => {
       lastError: { code: 'ROOM_FULL', message: 'full' },
     });
 
-    useRoomStore.getState().setRoomState({
-      roomId: '11111111-1111-4111-8111-111111111111',
-      code: 'ABC123',
-      maxSeats: 9,
-      players: [],
-      status: 'waiting',
-    });
+    useRoomStore.getState().setRoomState(mockRoomState());
 
     expect(useRoomStore.getState().lastError).toBeNull();
     expect(useRoomStore.getState().roomState?.code).toBe('ABC123');

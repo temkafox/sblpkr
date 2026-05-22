@@ -1,6 +1,7 @@
 import type {
   PlayerId,
   RoomMemberConnectionStatus,
+  RoomSettings,
   RoomStatus,
   SeatIndex,
 } from '@neonpoker/shared';
@@ -15,6 +16,7 @@ export type InternalSeatedPlayer = {
   socketId: string | null;
   connectionStatus: RoomMemberConnectionStatus;
   disconnectedAt?: number;
+  rebuyCount: number;
 };
 
 /** In-memory room record — mutable `players` while membership changes. */
@@ -27,6 +29,8 @@ export type MutableInternalRoom = {
   status: RoomStatus;
   players: InternalSeatedPlayer[];
   hostPlayerId: string | null;
+  settings: RoomSettings;
+  actionDeadlineAt: number | null;
 };
 
 export type SocketSession = {
@@ -44,7 +48,7 @@ export type DisconnectResult = {
 };
 
 export type CreateRoomOptions = {
-  readonly maxSeats?: 2 | 4 | 6 | 9;
+  readonly settings?: import('@neonpoker/shared').RoomSettingsPartial;
 };
 
 export type RoomCodeGenerator = () => string;

@@ -14,6 +14,7 @@ import { Server } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 
 import { ChatService } from '../chat/chat.service';
+import { ActionTimerService } from '../game/action-timer.service';
 import { GameBroadcastService } from '../game/game-broadcast';
 import { HandHistoryService } from '../game/hand-history.service';
 import { NextHandReadyService } from '../game/next-hand-ready.service';
@@ -93,12 +94,19 @@ describe('RoomGateway (Socket.IO)', () => {
       handHistory,
       nextHandReady,
     );
+    const actionTimer = new ActionTimerService(
+      roomService,
+      gameService,
+      gameBroadcast,
+      handHistory,
+    );
     gateway = new RoomGateway(
       roomService,
       gameService,
       gameBroadcast,
       nextHandReady,
       new ChatService(),
+      actionTimer,
     );
     gateway.onModuleInit();
     httpServer = createServer();
@@ -122,7 +130,7 @@ describe('RoomGateway (Socket.IO)', () => {
   });
 
   it('broadcasts ROOM_STATE when clients join', async () => {
-    const room = roomService.createRoom({ maxSeats: 6 });
+    const room = roomService.createRoom({ settings: { maxSeats: 6 } });
 
     const a = connectClient(port);
     const b = connectClient(port);

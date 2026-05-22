@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-
+import { DEFAULT_ROOM_SETTINGS } from '@neonpoker/shared';
 import type { CreateRoomResponse, GetRoomResponse } from '@neonpoker/shared';
 
 import { RoomController } from './room.controller';
@@ -17,6 +17,7 @@ describe('RoomController', () => {
     status: 'waiting',
     seatedCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
+    settings: DEFAULT_ROOM_SETTINGS,
   };
 
   const sampleGet: GetRoomResponse = {
@@ -26,20 +27,25 @@ describe('RoomController', () => {
     status: 'waiting',
     seatedCount: 0,
     capacityAvailable: true,
+    settings: DEFAULT_ROOM_SETTINGS,
   };
 
-  it('POST create delegates to RoomService', () => {
+  it('POST create delegates to RoomService with settings', () => {
     const createRoom = vi.fn().mockReturnValue(sampleCreate);
     const svc = { createRoom } as unknown as RoomService;
     const controller = new RoomController(svc);
 
-    const body = controller.create({ maxSeats: 6 });
+    const body = controller.create({
+      settings: { maxSeats: 6, startingStack: 500, smallBlind: 5, bigBlind: 10 },
+    });
 
-    expect(createRoom).toHaveBeenCalledWith({ maxSeats: 6 });
+    expect(createRoom).toHaveBeenCalledWith({
+      settings: { maxSeats: 6, startingStack: 500, smallBlind: 5, bigBlind: 10 },
+    });
     expect(body).toEqual(sampleCreate);
   });
 
-  it('POST create rejects invalid maxSeats', () => {
+  it('POST create rejects invalid settings', () => {
     const controller = new RoomController(
       RoomService.forTest({
         code: () => 'BAD001',
@@ -47,9 +53,9 @@ describe('RoomController', () => {
       }),
     );
 
-    expect(() => controller.create({ maxSeats: 5 })).toThrow(
-      RoomInvalidPayloadHttpException,
-    );
+    expect(() =>
+      controller.create({ settings: { startingStack: 5, smallBlind: 1, bigBlind: 2 } }),
+    ).toThrow(RoomInvalidPayloadHttpException);
   });
 
   it('GET returns public room state', () => {

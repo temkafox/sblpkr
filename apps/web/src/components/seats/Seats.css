@@ -440,7 +440,7 @@
   width: 100%;
   background: linear-gradient(90deg, var(--neon-cyan), var(--neon-violet));
   transform-origin: left;
-  animation: np-timer-deplete 15s linear forwards;
+  animation: np-timer-deplete var(--np-timer-duration, 30s) linear forwards;
   box-shadow: 0 0 10px rgba(34, 211, 255, 0.7);
 }
 

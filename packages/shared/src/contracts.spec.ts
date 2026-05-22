@@ -286,12 +286,18 @@ describe('ServerErrorPayloadSchema', () => {
 });
 
 describe('REST room schemas (Phase 6A)', () => {
-  it('CreateRoomRequestSchema accepts allowed maxSeats', () => {
+  it('CreateRoomRequestSchema accepts partial settings', () => {
     expect(CreateRoomRequestSchema.parse({})).toEqual({});
-    expect(CreateRoomRequestSchema.parse({ maxSeats: 9 })).toEqual({
-      maxSeats: 9,
+    expect(
+      CreateRoomRequestSchema.parse({
+        settings: { maxSeats: 9, actionTimeoutSeconds: 15 },
+      }),
+    ).toEqual({
+      settings: { maxSeats: 9, actionTimeoutSeconds: 15 },
     });
-    expect(() => CreateRoomRequestSchema.parse({ maxSeats: 5 })).toThrow();
+    expect(() =>
+      CreateRoomRequestSchema.parse({ settings: { maxSeats: 5 } }),
+    ).toThrow();
   });
 
   it('RoomCodeSchema normalizes to uppercase', () => {
@@ -311,6 +317,19 @@ describe('REST room schemas (Phase 6A)', () => {
       code: 'ABC123',
       maxSeats: 9,
       status: 'waiting',
+      settings: {
+        roomName: 'Neon Table',
+        maxSeats: 9,
+        startingStack: 200,
+        smallBlind: 1,
+        bigBlind: 2,
+        rebuyAmount: 200,
+        maxRebuysPerPlayer: null,
+        actionTimeoutSeconds: 30,
+        disconnectGraceSeconds: 30,
+        allowSpectators: false,
+        chatEnabled: true,
+      },
       players: [
         { playerId: 'p1', nickname: 'Neo', seatIndex: null, connectionStatus: 'connected' },
       ],

@@ -23,7 +23,23 @@ export class RoomController {
       throw new RoomInvalidPayloadHttpException(detail);
     }
 
-    return this.roomService.createRoom(parsed.data);
+    try {
+      return this.roomService.createRoom({ settings: parsed.data.settings });
+    } catch (err) {
+      const zodIssues =
+        err != null &&
+        typeof err === 'object' &&
+        'issues' in err &&
+        Array.isArray((err as { issues: unknown }).issues)
+          ? (err as { issues: { message?: string }[] }).issues
+          : null;
+      if (zodIssues != null) {
+        throw new RoomInvalidPayloadHttpException(
+          zodIssues[0]?.message ?? 'Invalid room settings',
+        );
+      }
+      throw err;
+    }
   }
 
   @Get(':roomIdOrCode')
