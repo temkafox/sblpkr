@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JoinRoomPage } from './JoinRoomPage';
 import * as roomSession from '../../net/roomSession';
@@ -20,6 +20,10 @@ vi.mock('../../net/roomSession', () => ({
 const roomId = '11111111-1111-4111-8111-111111111111';
 
 describe('JoinRoomPage backend integration', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     useSessionStore.setState({
@@ -42,6 +46,45 @@ describe('JoinRoomPage backend integration', () => {
     render(<RouterProvider router={router} />);
     return router;
   }
+
+  it('settings panel renders and keeps action buttons when expanded', () => {
+    renderJoin();
+
+    expect(
+      screen.getByRole('button', { name: /^create room settings$/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^join room$/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^create room$/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^create room settings$/i }));
+
+    expect(
+      screen.getByRole('button', { name: /^hide create room settings$/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /basic/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^create room$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /reset to defaults/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('advanced settings can be expanded and collapsed', () => {
+    renderJoin();
+
+    fireEvent.click(screen.getByRole('button', { name: /^create room settings$/i }));
+    expect(screen.queryByLabelText(/turn time/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^advanced settings$/i }));
+    expect(screen.getByLabelText(/turn time/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/disconnect grace/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^hide advanced settings$/i }));
+    expect(screen.queryByLabelText(/turn time/i)).not.toBeInTheDocument();
+  });
 
   it('create room settings panel sends settings payload', async () => {
     vi.mocked(roomsApi.createRoom).mockResolvedValue({
@@ -96,7 +139,7 @@ describe('JoinRoomPage backend integration', () => {
       target: { value: 'alice' },
     });
     fireEvent.click(
-      screen.getByRole('button', { name: /create room settings/i }),
+      screen.getByRole('button', { name: /^create room settings$/i }),
     );
     fireEvent.change(screen.getByLabelText(/starting stack/i), {
       target: { value: '500' },
@@ -111,9 +154,10 @@ describe('JoinRoomPage backend integration', () => {
       target: { value: '6' },
     });
     fireEvent.click(screen.getByLabelText(/unlimited rebuys/i));
-    fireEvent.change(screen.getByLabelText(/max rebuys per player/i), {
+    fireEvent.change(screen.getByLabelText(/max rebuys/i), {
       target: { value: '1' },
     });
+    fireEvent.click(screen.getByRole('button', { name: /^advanced settings$/i }));
     fireEvent.change(screen.getByLabelText(/turn time/i), {
       target: { value: '10' },
     });

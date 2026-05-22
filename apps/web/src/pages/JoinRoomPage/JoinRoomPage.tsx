@@ -176,6 +176,7 @@ export function JoinRoomPage() {
         </header>
 
         <form className="jr-form" onSubmit={handleSubmit} noValidate>
+          <div className="jr-form__scroll">
           {panelError ? (
             <p className="jr-panel__error" role="alert">
               {panelError}
@@ -246,6 +247,7 @@ export function JoinRoomPage() {
               disabled={busy}
             />
           ) : null}
+          </div>
 
           <div className="jr-actions">
             <button
